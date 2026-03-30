@@ -14,7 +14,7 @@ It automatically:
 
 Add these repository secrets in GitHub (`Settings -> Secrets and variables -> Actions`):
 - `VPS_HOST`: your VPS IP or hostname
-- `VPS_PORT`: SSH port
+- `VPS_PORT`: optional SSH port (defaults to `22`)
 - `VPS_USER`: SSH user on the VPS
 - `VPS_SSH_KEY`: private SSH key (matching the public key on VPS)
 - `VPS_SSH_PASSPHRASE`: optional passphrase for the SSH key

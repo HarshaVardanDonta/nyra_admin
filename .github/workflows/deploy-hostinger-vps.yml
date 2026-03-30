@@ -30,20 +30,38 @@ jobs:
       - name: Build app
         run: npm run build
 
+      - name: Resolve deploy port
+        id: deploy-vars
+        env:
+          VPS_PORT: ${{ secrets.VPS_PORT }}
+        run: |
+          set -eu
+          echo "port=${VPS_PORT:-22}" >> "$GITHUB_OUTPUT"
+
       - name: Validate required secrets
         env:
           VPS_HOST: ${{ secrets.VPS_HOST }}
-          VPS_PORT: ${{ secrets.VPS_PORT }}
           VPS_USER: ${{ secrets.VPS_USER }}
           VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
           VPS_TARGET_DIR: ${{ secrets.VPS_TARGET_DIR }}
         run: |
           set -eu
           [ -n "$VPS_HOST" ] || (echo "Missing secret: VPS_HOST" && exit 1)
-          [ -n "$VPS_PORT" ] || (echo "Missing secret: VPS_PORT" && exit 1)
           [ -n "$VPS_USER" ] || (echo "Missing secret: VPS_USER" && exit 1)
           [ -n "$VPS_SSH_KEY" ] || (echo "Missing secret: VPS_SSH_KEY" && exit 1)
           [ -n "$VPS_TARGET_DIR" ] || (echo "Missing secret: VPS_TARGET_DIR" && exit 1)
+
+      - name: Check SSH TCP reachability
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          DEPLOY_PORT: ${{ steps.deploy-vars.outputs.port }}
+        run: |
+          set -eu
+          echo "Checking TCP connectivity to ${VPS_HOST}:${DEPLOY_PORT}"
+          timeout 10 bash -c "cat < /dev/null > /dev/tcp/${VPS_HOST}/${DEPLOY_PORT}" || (
+            echo "Cannot reach ${VPS_HOST}:${DEPLOY_PORT} from GitHub runner. Check firewall/security-group/port forwarding."
+            exit 1
+          )
 
       - name: Upload build to VPS staging
         uses: appleboy/scp-action@v0.1.7
@@ -52,7 +70,7 @@ jobs:
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
           passphrase: ${{ secrets.VPS_SSH_PASSPHRASE }}
-          port: ${{ secrets.VPS_PORT }}
+          port: ${{ steps.deploy-vars.outputs.port }}
           source: "dist/*"
           target: "/tmp/nyra_admin_build"
           overwrite: true
@@ -66,7 +84,7 @@ jobs:
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
           passphrase: ${{ secrets.VPS_SSH_PASSPHRASE }}
-          port: ${{ secrets.VPS_PORT }}
+          port: ${{ steps.deploy-vars.outputs.port }}
           script: |
             set -eu
             TARGET_DIR="${{ secrets.VPS_TARGET_DIR }}"
