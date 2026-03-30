@@ -16,8 +16,7 @@ Add these repository secrets in GitHub (`Settings -> Secrets and variables -> Ac
 - `VPS_HOST`: your VPS IP or hostname
 - `VPS_PORT`: optional SSH port (defaults to `22`)
 - `VPS_USER`: SSH user on the VPS
-- `VPS_SSH_KEY`: private SSH key (matching the public key on VPS)
-- `VPS_SSH_PASSPHRASE`: optional passphrase for the SSH key
+- `VPS_SSH_KEY`: private SSH key (matching the public key on VPS, without passphrase for CI)
 - `VPS_TARGET_DIR`: deploy directory on VPS (for example `/var/www/nyra_admin`)
 
 Currently, two official plugins are available:
