@@ -2,6 +2,24 @@
 
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
 
+## Deploy to Hostinger VPS (GitHub Actions)
+
+This repo includes `.github/workflows/deploy-hostinger-vps.yml`.
+
+It automatically:
+- Runs on push to `main` (or manually from Actions tab)
+- Builds the app (`npm ci` + `npm run build`)
+- Uploads `dist/` to your VPS with `appleboy/scp-action`
+- Promotes staged build files to the final deploy directory over SSH
+
+Add these repository secrets in GitHub (`Settings -> Secrets and variables -> Actions`):
+- `VPS_HOST`: your VPS IP or hostname
+- `VPS_PORT`: SSH port
+- `VPS_USER`: SSH user on the VPS
+- `VPS_SSH_KEY`: private SSH key (matching the public key on VPS)
+- `VPS_SSH_PASSPHRASE`: optional passphrase for the SSH key
+- `VPS_TARGET_DIR`: deploy directory on VPS (for example `/var/www/nyra_admin`)
+
 Currently, two official plugins are available:
 
 - [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)

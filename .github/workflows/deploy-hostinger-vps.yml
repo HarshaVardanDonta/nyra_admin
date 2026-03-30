@@ -1,0 +1,77 @@
+name: Deploy to Hostinger VPS
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: true
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build app
+        run: npm run build
+
+      - name: Validate required secrets
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_PORT: ${{ secrets.VPS_PORT }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_TARGET_DIR: ${{ secrets.VPS_TARGET_DIR }}
+        run: |
+          set -eu
+          [ -n "$VPS_HOST" ] || (echo "Missing secret: VPS_HOST" && exit 1)
+          [ -n "$VPS_PORT" ] || (echo "Missing secret: VPS_PORT" && exit 1)
+          [ -n "$VPS_USER" ] || (echo "Missing secret: VPS_USER" && exit 1)
+          [ -n "$VPS_SSH_KEY" ] || (echo "Missing secret: VPS_SSH_KEY" && exit 1)
+          [ -n "$VPS_TARGET_DIR" ] || (echo "Missing secret: VPS_TARGET_DIR" && exit 1)
+
+      - name: Upload build to VPS staging
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          passphrase: ${{ secrets.VPS_SSH_PASSPHRASE }}
+          port: ${{ secrets.VPS_PORT }}
+          source: "dist/*"
+          target: "/tmp/nyra_admin_build"
+          overwrite: true
+          strip_components: 1
+          rm: true
+
+      - name: Run remote deploy script
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          passphrase: ${{ secrets.VPS_SSH_PASSPHRASE }}
+          port: ${{ secrets.VPS_PORT }}
+          script: |
+            set -eu
+            TARGET_DIR="${{ secrets.VPS_TARGET_DIR }}"
+            STAGING_DIR="/tmp/nyra_admin_build"
+
+            mkdir -p "$TARGET_DIR"
+            find "$TARGET_DIR" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
+            cp -R "$STAGING_DIR"/. "$TARGET_DIR"/
