@@ -7,10 +7,25 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
+# Dependencies & build
 node_modules
 dist
 dist-ssr
 *.local
+
+# Env — real secrets and machine-specific values (template stays tracked)
+.env
+.env.*
+!.env.example
+
+# TypeScript
+*.tsbuildinfo
+
+# Testing / coverage
+coverage
+
+# Linters
+.eslintcache
 
 # Editor directories and files
 .vscode/*
