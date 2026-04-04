@@ -103,7 +103,7 @@ export function CollectionsPage() {
   }
 
   return (
-    <div className="min-h-full bg-[#0b0e14] p-6 pb-28 text-slate-50 lg:p-10">
+    <div className="bg-[#0b0e14] p-6 pb-28 text-slate-50 lg:p-10">
       <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-white">Collections</h1>

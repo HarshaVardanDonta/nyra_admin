@@ -73,6 +73,14 @@ const OrderLifecyclePage = lazy(() =>
   import('./pages/order-lifecycle-page').then((m) => ({ default: m.OrderLifecyclePage })),
 )
 
+const OrdersPage = lazy(() =>
+  import('./pages/orders-page').then((m) => ({ default: m.OrdersPage })),
+)
+
+const OrderDetailPage = lazy(() =>
+  import('./pages/order-detail-page').then((m) => ({ default: m.OrderDetailPage })),
+)
+
 const CouponsPage = lazy(() =>
   import('./pages/coupons-page').then((m) => ({ default: m.CouponsPage })),
 )
@@ -271,6 +279,22 @@ function App() {
                   element={
                     <Suspense fallback={pageFallback}>
                       <PromotionDetailPage />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="/orders"
+                  element={
+                    <Suspense fallback={pageFallback}>
+                      <OrdersPage />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="/orders/:orderId"
+                  element={
+                    <Suspense fallback={pageFallback}>
+                      <OrderDetailPage />
                     </Suspense>
                   }
                 />

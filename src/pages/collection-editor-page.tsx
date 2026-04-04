@@ -413,7 +413,7 @@ export function CollectionEditorPage() {
   }
 
   return (
-    <div className="min-h-full bg-[#0b0e14] p-6 pb-32 text-slate-200 lg:p-10">
+    <div className="bg-[#0b0e14] p-6 pb-32 text-slate-200 lg:p-10">
       <nav className="mb-6 text-sm text-slate-500">
         <Link to="/collections" className="hover:text-blue-400">
           Collections

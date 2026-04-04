@@ -11,15 +11,15 @@
 
 @layer base {
   html {
-    @apply font-sans antialiased;
+    @apply h-svh overflow-hidden font-sans antialiased;
   }
 
   body {
-    @apply m-0 min-h-svh bg-slate-100 text-slate-900 dark:bg-[#0b1120] dark:text-slate-50;
+    @apply m-0 h-svh min-h-0 overflow-hidden bg-slate-100 text-slate-900 dark:bg-[#0b1120] dark:text-slate-50;
   }
 
   #root {
-    @apply min-h-svh w-full text-left;
+    @apply h-svh min-h-0 w-full overflow-hidden text-left;
   }
 
   *,

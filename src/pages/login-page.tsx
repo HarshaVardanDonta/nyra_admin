@@ -101,9 +101,9 @@ export function LoginPage() {
   }
 
   return (
-    <div className="relative flex min-h-svh items-center justify-center bg-[radial-gradient(ellipse_80%_50%_at_50%_-20%,rgba(37,99,235,0.08),transparent),rgb(241_245_249)] px-4 py-12 dark:bg-[radial-gradient(ellipse_80%_50%_at_50%_-20%,rgba(37,99,235,0.12),transparent),rgb(11_17_32)]">
+    <div className="relative h-full min-h-0 overflow-y-auto overscroll-y-contain bg-[radial-gradient(ellipse_80%_50%_at_50%_-20%,rgba(37,99,235,0.08),transparent),rgb(241_245_249)] dark:bg-[radial-gradient(ellipse_80%_50%_at_50%_-20%,rgba(37,99,235,0.12),transparent),rgb(11_17_32)]">
       <div
-        className="pointer-events-none absolute inset-0 opacity-[0.07]"
+        className="pointer-events-none fixed inset-0 opacity-[0.07]"
         aria-hidden
       >
         <svg
@@ -124,26 +124,27 @@ export function LoginPage() {
         </svg>
       </div>
 
-      <div className="relative w-full max-w-[400px] rounded-xl border border-slate-200 bg-white p-8 shadow-xl shadow-slate-900/10 dark:border-slate-800 dark:bg-slate-900 dark:shadow-black/20">
-        <div className="mb-8">
+      <div className="relative flex min-h-full items-center justify-center px-4 py-12">
+        <div className="relative w-full max-w-[400px] rounded-xl border border-slate-200 bg-white p-8 shadow-xl shadow-slate-900/10 dark:border-slate-800 dark:bg-slate-900 dark:shadow-black/20">
+          <div className="mb-8">
           <BrandMark />
           <p className="mt-4 text-center text-sm text-slate-500 dark:text-slate-400">
             {showOtpStep
               ? 'Enter the OTP sent to your phone'
               : 'Sign in with your admin phone number'}
           </p>
-        </div>
+          </div>
 
-        {error ? (
+          {error ? (
           <div
             className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-500/35 dark:bg-red-500/10 dark:text-red-200"
             role="alert"
           >
             {error}
           </div>
-        ) : null}
+          ) : null}
 
-        {!showOtpStep ? (
+          {!showOtpStep ? (
           <form onSubmit={handleSendOtp} className="flex flex-col gap-4">
             <div className="text-left">
               <label
@@ -171,8 +172,8 @@ export function LoginPage() {
               {loading ? 'Sending…' : 'Send OTP'}
             </button>
           </form>
-        ) : (
-          <form onSubmit={handleVerify} className="flex flex-col gap-4">
+          ) : (
+            <form onSubmit={handleVerify} className="flex flex-col gap-4">
             <p className="text-left text-xs text-slate-500 dark:text-slate-400">
               Code sent to{' '}
               <span className="text-slate-900 dark:text-slate-50">{phone.trim()}</span>
@@ -210,16 +211,17 @@ export function LoginPage() {
             >
               {loading ? 'Signing in…' : 'Log in'}
             </button>
-          </form>
-        )}
-        <div className="mt-6 flex justify-center border-t border-slate-200 pt-4 dark:border-slate-700">
-          <button
-            type="button"
-            onClick={toggleTheme}
-            className="text-xs font-medium text-slate-500 transition hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-50"
-          >
-            {theme === 'dark' ? 'Light mode' : 'Dark mode'}
-          </button>
+            </form>
+          )}
+          <div className="mt-6 flex justify-center border-t border-slate-200 pt-4 dark:border-slate-700">
+            <button
+              type="button"
+              onClick={toggleTheme}
+              className="text-xs font-medium text-slate-500 transition hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-50"
+            >
+              {theme === 'dark' ? 'Light mode' : 'Dark mode'}
+            </button>
+          </div>
         </div>
       </div>
     </div>

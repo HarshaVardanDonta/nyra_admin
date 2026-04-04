@@ -214,16 +214,15 @@ export function DashboardPage() {
             </svg>
             Create Product
           </button>
-          <button
-            type="button"
-            onClick={() => showToast('Coupon creation is not available yet', 'info')}
+          <Link
+            to="/coupons/new"
             className="inline-flex items-center gap-2 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-800 px-4 py-2.5 text-sm font-medium text-slate-900 dark:text-slate-50 transition hover:border-slate-500"
           >
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M15 5v2M15 17v2M9 5v2M9 17v2" />
             </svg>
             Create Coupon
-          </button>
+          </Link>
           <Link
             to="/promotions"
             className="inline-flex items-center gap-2 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-800 px-4 py-2.5 text-sm font-medium text-slate-900 dark:text-slate-50 transition hover:border-slate-500"

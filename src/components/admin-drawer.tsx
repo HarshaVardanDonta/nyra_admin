@@ -156,7 +156,7 @@ export function AdminDrawer() {
   }
 
   return (
-    <aside className="flex h-full min-h-0 w-[260px] shrink-0 flex-col border-r border-slate-200 bg-white dark:border-slate-800 dark:bg-[#0a0c10]">
+    <aside className="flex h-full min-h-0 w-[260px] shrink-0 flex-col overflow-hidden border-r border-slate-200 bg-white dark:border-slate-800 dark:bg-[#0a0c10]">
       <div className="flex items-center gap-2.5 px-5 py-6">
         <span
           className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-600/15 text-blue-600"
@@ -173,11 +173,11 @@ export function AdminDrawer() {
       </div>
 
       <nav
-        className={`${adminScrollbarClass} flex-1 overflow-y-auto px-3 pb-4`}
+        className={`${adminScrollbarClass} min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-3 pb-4`}
       >
         <NavGroup title="Main">
           <NavRow to="/dashboard" label="Dashboard" icon="dashboard" />
-          <NavRow label="Orders" icon="orders" disabled />
+          <NavRow to="/orders" label="Orders" icon="orders" />
           <NavRow to="/products" label="Products" icon="box" />
           <NavRow to="/categories" label="Categories" icon="folder" />
           <NavRow to="/brands" label="Brands" icon="tag" />
