@@ -3,6 +3,9 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        # Loaded from project .env (same directory as this file). Not available inside the image at runtime.
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:?Set VITE_API_BASE_URL in .env - see .env.example}
     container_name: nyra_admin
     ports:
       - "8081:80"
