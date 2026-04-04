@@ -1,0 +1,9 @@
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: nyra_admin
+    ports:
+      - "8080:80"
+    restart: unless-stopped

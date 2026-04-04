@@ -11,7 +11,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build-and-deploy:
+  test-and-deploy:
     runs-on: ubuntu-latest
 
     steps:
@@ -24,57 +24,42 @@ jobs:
           node-version: 22
           cache: npm
 
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Build app
-        run: npm run build
-
-      - name: Resolve deploy port
-        id: deploy-vars
-        env:
-          VPS_PORT: ${{ secrets.VPS_PORT }}
+      - name: Install dependencies and build
         run: |
-          set -eu
-          echo "port=${VPS_PORT:-22}" >> "$GITHUB_OUTPUT"
+          npm ci
+          npm run build
+
+      - name: Remove node_modules before upload
+        run: rm -rf node_modules
 
       - name: Validate required secrets
         env:
           VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_PORT: ${{ secrets.VPS_PORT }}
           VPS_USER: ${{ secrets.VPS_USER }}
           VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
-          VPS_TARGET_DIR: ${{ secrets.VPS_TARGET_DIR }}
+          VPS_SSH_PASSPHRASE: ${{ secrets.VPS_SSH_PASSPHRASE }}
         run: |
           set -eu
           [ -n "$VPS_HOST" ] || (echo "Missing secret: VPS_HOST" && exit 1)
+          [ -n "$VPS_PORT" ] || (echo "Missing secret: VPS_PORT" && exit 1)
           [ -n "$VPS_USER" ] || (echo "Missing secret: VPS_USER" && exit 1)
           [ -n "$VPS_SSH_KEY" ] || (echo "Missing secret: VPS_SSH_KEY" && exit 1)
-          [ -n "$VPS_TARGET_DIR" ] || (echo "Missing secret: VPS_TARGET_DIR" && exit 1)
+          [ -n "$VPS_SSH_PASSPHRASE" ] || (echo "Missing secret: VPS_SSH_PASSPHRASE" && exit 1)
 
-      - name: Check SSH TCP reachability
-        env:
-          VPS_HOST: ${{ secrets.VPS_HOST }}
-          DEPLOY_PORT: ${{ steps.deploy-vars.outputs.port }}
-        run: |
-          set -eu
-          echo "Checking TCP connectivity to ${VPS_HOST}:${DEPLOY_PORT}"
-          timeout 10 bash -c "cat < /dev/null > /dev/tcp/${VPS_HOST}/${DEPLOY_PORT}" || (
-            echo "Cannot reach ${VPS_HOST}:${DEPLOY_PORT} from GitHub runner. Check firewall/security-group/port forwarding."
-            exit 1
-          )
-
-      - name: Upload build to VPS staging
+      - name: Upload code to VPS
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
-          port: ${{ steps.deploy-vars.outputs.port }}
-          source: "dist/*"
-          target: "/tmp/nyra_admin_build"
+          passphrase: ${{ secrets.VPS_SSH_PASSPHRASE }}
+          port: ${{ secrets.VPS_PORT }}
+          source: "."
+          target: "/opt/nyra_admin"
           overwrite: true
-          strip_components: 1
-          rm: true
+          strip_components: 0
+          rm: false
 
       - name: Run remote deploy script
         uses: appleboy/ssh-action@v1.2.0
@@ -82,12 +67,10 @@ jobs:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
-          port: ${{ steps.deploy-vars.outputs.port }}
+          passphrase: ${{ secrets.VPS_SSH_PASSPHRASE }}
+          port: ${{ secrets.VPS_PORT }}
           script: |
             set -eu
-            TARGET_DIR="${{ secrets.VPS_TARGET_DIR }}"
-            STAGING_DIR="/tmp/nyra_admin_build"
-
-            mkdir -p "$TARGET_DIR"
-            find "$TARGET_DIR" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
-            cp -R "$STAGING_DIR"/. "$TARGET_DIR"/
+            cd /opt/nyra_admin
+            chmod +x scripts/deploy.sh
+            ./scripts/deploy.sh /opt/nyra_admin docker-compose.yml
