@@ -4,14 +4,11 @@ import { useAuth } from '../contexts/use-auth'
 import { useToast } from '../contexts/use-toast'
 import { deleteCategory, fetchCategoryDetail, fetchChildCategories, type CategoryRecord } from '../lib/api/categories'
 import { fetchCatalogCategories, fetchProductsList, type CatalogCategory } from '../lib/api/catalog'
+import { formatInr } from '../lib/api/products'
 import { resolveMediaUrl } from '../lib/media-url'
 
 function formatInt(n: number) {
   return new Intl.NumberFormat('en-IN').format(n)
-}
-
-function formatInrFromCents(cents: number) {
-  return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(cents / 100)
 }
 
 function formatDate(iso: string | undefined) {
@@ -272,7 +269,7 @@ export function CategoryDetailPage() {
             </span>
           </div>
           <p className="mt-3 text-2xl font-semibold tabular-nums">
-            {revenueSampleCents != null ? formatInrFromCents(revenueSampleCents) : '—'}
+            {revenueSampleCents != null ? formatInr(revenueSampleCents) : '—'}
           </p>
           <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">basePrice × stock on first 100 rows</p>
         </div>

@@ -10,6 +10,7 @@ import {
   type CatalogCategory,
   type CatalogProductRow,
 } from '../lib/api/catalog'
+import { formatInr } from '../lib/api/products'
 import { resolveMediaUrl } from '../lib/media-url'
 
 function formatInrFromCents(cents: number | undefined | null) {
@@ -389,7 +390,7 @@ export function BrandDetailPage() {
                             {cat}
                           </span>
                         </td>
-                        <td className="px-4 py-3 tabular-nums">{formatInrFromCents(row.basePrice)}</td>
+                        <td className="px-4 py-3 tabular-nums">{formatInr(row.basePrice)}</td>
                         <td className="px-4 py-3">
                           <span className="inline-flex items-center gap-2 text-xs">
                             <span className={`h-2 w-2 rounded-full ${stockDotClass(st)}`} aria-hidden />

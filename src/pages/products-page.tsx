@@ -12,7 +12,7 @@ import {
   type CatalogBrand,
   type PublicationListFilter,
 } from '../lib/api/catalog'
-import { patchProductFromCatalog } from '../lib/api/products'
+import { formatInr, patchProductFromCatalog } from '../lib/api/products'
 import { resolveMediaUrl } from '../lib/media-url'
 
 const PER_PAGE = 10
@@ -22,13 +22,6 @@ type DiscountFilter = 'all' | 'active' | 'inactive'
 
 function isUnpublishedProduct(row: CatalogProductRow) {
   return row.status?.isPublished === false
-}
-
-function formatInrFromCents(cents: number | undefined | null) {
-  if (cents === undefined || cents === null || !Number.isFinite(cents)) return '—'
-  return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(
-    cents / 100,
-  )
 }
 
 function discountPercent(base: number, discount: number) {
@@ -310,7 +303,7 @@ export function ProductsPage() {
       sku: r.sku ?? '',
       brand: r.brand?.name ?? '',
       category: categoryBreadcrumb(categories, r.category?.id ?? r.categoryId),
-      price_cents: String(r.basePrice ?? ''),
+      price_inr: String(r.basePrice ?? ''),
       stock: String(r.stockQuantity ?? ''),
     }))
     downloadCsv(`products-page-${page}.csv`, rows)
@@ -574,7 +567,7 @@ export function ProductsPage() {
                         </p>
                       </td>
                       <td className="px-4 py-3 align-middle">
-                        <p className="font-medium tabular-nums">{formatInrFromCents(row.basePrice)}</p>
+                        <p className="font-medium tabular-nums">{formatInr(row.basePrice)}</p>
                         {pct != null ? (
                           <p className="text-xs font-medium text-emerald-600 dark:text-emerald-400">
                             {pct}% Off Active

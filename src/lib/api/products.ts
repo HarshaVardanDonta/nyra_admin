@@ -25,7 +25,7 @@ export async function createProduct(
 export async function updateProduct(
   token: string,
   productId: string,
-  body: Record<string, unknown>,
+  body: Record<string, unknown> | FormData,
 ): Promise<unknown> {
   const encoded = encodeURIComponent(productId)
   return request(`/api/v1/products/${encoded}`, {
@@ -127,14 +127,20 @@ export async function patchProductFromCatalog(
   return updateProduct(token, productId, fullProductPatchFromListRow(row, amend))
 }
 
-/** Cents from dollar input string */
-export function dollarsToCents(raw: string): number {
+/** Nyra POST/PATCH send `basePrice` / `discountPrice` as whole rupees (see multipart `basePrice="4999"`). */
+export function parseInrInputToRupees(raw: string): number {
   const n = Number.parseFloat(raw.replace(/[^0-9.-]/g, ''))
   if (!Number.isFinite(n) || n < 0) return 0
-  return Math.round(n * 100)
+  return Math.round(n)
 }
 
-export function centsToDollarsString(cents: number | undefined | null): string {
-  if (cents === undefined || cents === null || !Number.isFinite(cents)) return ''
-  return (cents / 100).toFixed(2)
+export function rupeesToFormString(rupees: number | undefined | null): string {
+  if (rupees === undefined || rupees === null || !Number.isFinite(rupees)) return ''
+  return String(rupees)
+}
+
+/** `en-IN` currency (₹) for whole-rupee amounts from the API. */
+export function formatInr(rupees: number | undefined | null): string {
+  if (rupees === undefined || rupees === null || !Number.isFinite(rupees)) return '—'
+  return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(rupees)
 }

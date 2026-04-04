@@ -11,9 +11,9 @@ import {
   type CatalogProductRow,
 } from '../lib/api/catalog'
 import {
-  centsToDollarsString,
   createProduct,
-  dollarsToCents,
+  parseInrInputToRupees,
+  rupeesToFormString,
   updateProduct,
   type ProductSeoInput,
   type ProductStatusInput,
@@ -126,8 +126,10 @@ function mapProductToForm(p: CatalogProductRow) {
     description: p.description ?? '',
     brandId: p.brand?.id ?? p.brandId ?? '',
     categoryId: p.category?.id ?? p.categoryId ?? '',
-    basePriceDollars: centsToDollarsString(p.basePrice),
-    discountPriceDollars: centsToDollarsString(p.discountPrice ?? undefined),
+    basePriceRupees: rupeesToFormString(p.basePrice),
+    discountPriceRupees: rupeesToFormString(
+      p.discountPrice === null || p.discountPrice === undefined ? undefined : p.discountPrice,
+    ),
     hasSpecialDiscount: Boolean(p.hasSpecialDiscount),
     discountExpiry: p.discountExpiry ? p.discountExpiry.slice(0, 10) : '',
     sku: p.sku ?? '',
@@ -162,8 +164,8 @@ export function ProductEditorPage() {
   const [description, setDescription] = useState('')
   const [brandId, setBrandId] = useState('')
   const [categoryId, setCategoryId] = useState('')
-  const [basePriceDollars, setBasePriceDollars] = useState('0.00')
-  const [discountPriceDollars, setDiscountPriceDollars] = useState('0.00')
+  const [basePriceRupees, setBasePriceRupees] = useState('0')
+  const [discountPriceRupees, setDiscountPriceRupees] = useState('0')
   const [hasSpecialDiscount, setHasSpecialDiscount] = useState(false)
   const [discountExpiry, setDiscountExpiry] = useState('')
   const [sku, setSku] = useState('')
@@ -181,6 +183,7 @@ export function ProductEditorPage() {
   const [scheduledAt, setScheduledAt] = useState('')
   const [mediaFiles, setMediaFiles] = useState<File[]>([])
   const [mediaJsonInput, setMediaJsonInput] = useState('')
+  const [existingMedia, setExistingMedia] = useState<unknown[]>([])
   const [existingThumb, setExistingThumb] = useState('')
 
   const loadMeta = useCallback(async () => {
@@ -207,8 +210,8 @@ export function ProductEditorPage() {
         setDescription(f.description)
         setBrandId(f.brandId)
         setCategoryId(f.categoryId)
-        setBasePriceDollars(f.basePriceDollars || '0.00')
-        setDiscountPriceDollars(f.discountPriceDollars || '0.00')
+        setBasePriceRupees(f.basePriceRupees || '0')
+        setDiscountPriceRupees(f.discountPriceRupees || '0')
         setHasSpecialDiscount(f.hasSpecialDiscount)
         setDiscountExpiry(f.discountExpiry)
         setSku(dupId ? `${f.sku}-COPY` : f.sku)
@@ -221,6 +224,7 @@ export function ProductEditorPage() {
         setMetaDescription(f.metaDescription)
         setVisibility(f.visibility)
         setScheduledAt(f.scheduledAt)
+        setExistingMedia(Array.isArray(p.media) ? p.media : [])
         setExistingThumb(p.thumbnailUrl ? resolveMediaUrl(p.thumbnailUrl) : '')
       } catch (e) {
         if (!cancelled) showApiError(e)
@@ -296,6 +300,47 @@ export function ProductEditorPage() {
     }
   }
 
+  /** Keeps existing catalog media and merges optional extra media JSON (e.g. video URLs). */
+  function mediaPayloadForJsonPatch(): unknown[] {
+    const base = [...existingMedia]
+    const raw = mediaJsonInput.trim()
+    if (!raw) return base
+    try {
+      const parsed = JSON.parse(raw) as unknown
+      if (Array.isArray(parsed)) return [...base, ...parsed]
+    } catch {
+      /* ignore invalid JSON; base payload still saves */
+    }
+    return base
+  }
+
+  function buildProductFormData(published: boolean): FormData {
+    const fd = new FormData()
+    fd.set('name', name.trim())
+    fd.set('description', description.trim())
+    fd.set('brandId', brandId)
+    fd.set('categoryId', categoryId)
+    fd.set('basePrice', String(parseInrInputToRupees(basePriceRupees)))
+    fd.set('discountPrice', String(parseInrInputToRupees(discountPriceRupees)))
+    fd.set('hasSpecialDiscount', String(hasSpecialDiscount))
+    if (discountExpiry) {
+      fd.set('discountExpiry', new Date(discountExpiry + 'T12:00:00Z').toISOString())
+    }
+    fd.set('sku', sku.trim())
+    fd.set('stockQuantity', String(Number.parseInt(stockQuantity, 10) || 0))
+    fd.set('isOutOfStock', String(isOutOfStock))
+    fd.set('variants', JSON.stringify(buildVariantsPayload()))
+    fd.set('seo', JSON.stringify(buildSeo()))
+    fd.set('status', JSON.stringify(buildStatus(published)))
+    if (mediaJsonInput.trim()) {
+      fd.set('mediaJson', mediaJsonInput.trim())
+    }
+    for (const file of mediaFiles.slice(0, 10)) {
+      fd.append('media', file)
+    }
+    return fd
+  }
+
   async function handleSubmit(mode: 'draft' | 'publish') {
     if (!token) {
       showToast('Sign in again to continue.', 'error')
@@ -314,52 +359,34 @@ export function ProductEditorPage() {
     setSaving(true)
     try {
       if (isEdit && productId) {
-        const body: Record<string, unknown> = {
-          name: name.trim(),
-          description: description.trim(),
-          brandId,
-          categoryId,
-          basePrice: dollarsToCents(basePriceDollars),
-          discountPrice: dollarsToCents(discountPriceDollars),
-          hasSpecialDiscount,
-          discountExpiry: discountExpiry
-            ? new Date(discountExpiry + 'T12:00:00Z').toISOString()
-            : null,
-          sku: sku.trim(),
-          stockQuantity: Number.parseInt(stockQuantity, 10) || 0,
-          isOutOfStock,
-          media: [],
-          variants: buildVariantsPayload(),
-          seo: buildSeo(),
-          status: buildStatus(published),
+        if (mediaFiles.length > 0) {
+          await updateProduct(token, productId, buildProductFormData(published))
+        } else {
+          const body: Record<string, unknown> = {
+            name: name.trim(),
+            description: description.trim(),
+            brandId,
+            categoryId,
+            basePrice: parseInrInputToRupees(basePriceRupees),
+            discountPrice: parseInrInputToRupees(discountPriceRupees),
+            hasSpecialDiscount,
+            discountExpiry: discountExpiry
+              ? new Date(discountExpiry + 'T12:00:00Z').toISOString()
+              : null,
+            sku: sku.trim(),
+            stockQuantity: Number.parseInt(stockQuantity, 10) || 0,
+            isOutOfStock,
+            media: mediaPayloadForJsonPatch(),
+            variants: buildVariantsPayload(),
+            seo: buildSeo(),
+            status: buildStatus(published),
+          }
+          await updateProduct(token, productId, body)
         }
-        await updateProduct(token, productId, body)
         showToast(published ? 'Product published' : 'Draft saved', 'success')
         navigate('/products')
       } else {
-        const fd = new FormData()
-        fd.set('name', name.trim())
-        fd.set('description', description.trim())
-        fd.set('brandId', brandId)
-        fd.set('categoryId', categoryId)
-        fd.set('basePrice', String(dollarsToCents(basePriceDollars)))
-        fd.set('discountPrice', String(dollarsToCents(discountPriceDollars)))
-        fd.set('hasSpecialDiscount', String(hasSpecialDiscount))
-        if (discountExpiry) {
-          fd.set('discountExpiry', new Date(discountExpiry + 'T12:00:00Z').toISOString())
-        }
-        fd.set('sku', sku.trim())
-        fd.set('stockQuantity', String(Number.parseInt(stockQuantity, 10) || 0))
-        fd.set('isOutOfStock', String(isOutOfStock))
-        fd.set('variants', JSON.stringify(buildVariantsPayload()))
-        fd.set('seo', JSON.stringify(buildSeo()))
-        fd.set('status', JSON.stringify(buildStatus(published)))
-        if (mediaJsonInput.trim()) {
-          fd.set('mediaJson', mediaJsonInput.trim())
-        }
-        for (const f of mediaFiles.slice(0, 10)) {
-          fd.append('media', f)
-        }
+        const fd = buildProductFormData(published)
         await createProduct(token, fd)
         showToast(published ? 'Product published' : 'Draft saved', 'success')
         navigate('/products')
@@ -678,10 +705,10 @@ export function ProductEditorPage() {
                   Base price
                 </label>
                 <div className="mt-1 flex rounded-lg border border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-900/80">
-                  <span className="border-r border-slate-200 px-3 py-2 text-slate-500 dark:border-slate-700">$</span>
+                  <span className="border-r border-slate-200 px-3 py-2 text-slate-500 dark:border-slate-700">₹</span>
                   <input
-                    value={basePriceDollars}
-                    onChange={(e) => setBasePriceDollars(e.target.value)}
+                    value={basePriceRupees}
+                    onChange={(e) => setBasePriceRupees(e.target.value)}
                     inputMode="decimal"
                     className="min-w-0 flex-1 border-0 bg-transparent px-3 py-2 text-sm outline-none"
                   />
@@ -692,10 +719,10 @@ export function ProductEditorPage() {
                   Discount price
                 </label>
                 <div className="mt-1 flex rounded-lg border border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-900/80">
-                  <span className="border-r border-slate-200 px-3 py-2 text-slate-500 dark:border-slate-700">$</span>
+                  <span className="border-r border-slate-200 px-3 py-2 text-slate-500 dark:border-slate-700">₹</span>
                   <input
-                    value={discountPriceDollars}
-                    onChange={(e) => setDiscountPriceDollars(e.target.value)}
+                    value={discountPriceRupees}
+                    onChange={(e) => setDiscountPriceRupees(e.target.value)}
                     inputMode="decimal"
                     className="min-w-0 flex-1 border-0 bg-transparent px-3 py-2 text-sm outline-none"
                   />

@@ -14,6 +14,152 @@ export type CatalogCategory = {
   parentCategoryId?: string | null
 }
 
+function pickRecordField<T>(
+  o: Record<string, unknown>,
+  camel: string,
+  pascal: string,
+): T | undefined {
+  const v = o[camel] ?? o[pascal]
+  return v as T | undefined
+}
+
+function pickStr(o: Record<string, unknown>, camel: string, pascal: string): string | undefined {
+  const v = pickRecordField<unknown>(o, camel, pascal)
+  if (typeof v === 'string') return v
+  if (v != null && typeof v !== 'object') return String(v)
+  return undefined
+}
+
+function pickNum(o: Record<string, unknown>, camel: string, pascal: string): number | undefined {
+  const v = pickRecordField<unknown>(o, camel, pascal)
+  if (typeof v === 'number' && Number.isFinite(v)) return v
+  if (typeof v === 'string' && v.trim()) {
+    const n = Number(v)
+    if (Number.isFinite(n)) return n
+  }
+  return undefined
+}
+
+function pickNumOrNull(
+  o: Record<string, unknown>,
+  camel: string,
+  pascal: string,
+): number | null | undefined {
+  const v = pickRecordField<unknown>(o, camel, pascal)
+  if (v === null) return null
+  if (typeof v === 'number' && Number.isFinite(v)) return v
+  if (typeof v === 'string' && v.trim()) {
+    const n = Number(v)
+    if (Number.isFinite(n)) return n
+  }
+  return undefined
+}
+
+function pickBool(o: Record<string, unknown>, camel: string, pascal: string): boolean | undefined {
+  const v = pickRecordField<unknown>(o, camel, pascal)
+  if (typeof v === 'boolean') return v
+  if (v === 'true') return true
+  if (v === 'false') return false
+  return undefined
+}
+
+/**
+ * Admin/create responses may use Go-style PascalCase for nested fields; normalize to the shape the UI expects.
+ */
+export function normalizeCatalogProductRow(raw: unknown): CatalogProductRow {
+  if (!raw || typeof raw !== 'object') {
+    return { id: '', name: '' }
+  }
+  const o = raw as Record<string, unknown>
+  const id = typeof o.id === 'string' ? o.id : o.id != null ? String(o.id) : ''
+  const name = typeof o.name === 'string' ? o.name : ''
+
+  const seoRaw = o.seo
+  let seo: CatalogProductRow['seo']
+  if (seoRaw && typeof seoRaw === 'object') {
+    const s = seoRaw as Record<string, unknown>
+    seo = {
+      slug: pickStr(s, 'slug', 'Slug'),
+      metaTitle: pickStr(s, 'metaTitle', 'MetaTitle'),
+      metaDescription: pickStr(s, 'metaDescription', 'MetaDescription'),
+    }
+  }
+
+  const statusRaw = o.status
+  let status: CatalogProductRow['status']
+  if (statusRaw && typeof statusRaw === 'object') {
+    const st = statusRaw as Record<string, unknown>
+    const isPub = pickBool(st, 'isPublished', 'IsPublished')
+    const vis = pickStr(st, 'visibility', 'Visibility')
+    const sched = st.scheduledAt ?? st.ScheduledAt
+    status = {
+      isPublished: isPub,
+      visibility: vis,
+      scheduledAt:
+        sched === null || typeof sched === 'string' ? (sched as string | null) : undefined,
+    }
+  }
+
+  let variants: CatalogProductRow['variants']
+  const variantsRaw = o.variants
+  if (Array.isArray(variantsRaw)) {
+    variants = variantsRaw.map((item) => {
+      if (!item || typeof item !== 'object') return { name: '', values: [] as string[] }
+      const vr = item as Record<string, unknown>
+      const vn = pickStr(vr, 'name', 'Name') ?? ''
+      const vals = vr.values ?? vr.Values
+      const values = Array.isArray(vals)
+        ? vals.map((x) => (typeof x === 'string' ? x : x != null ? String(x) : '')).filter(Boolean)
+        : []
+      return { name: vn, values }
+    })
+  }
+
+  const media = Array.isArray(o.media) ? o.media : undefined
+  let thumbnailUrl = pickStr(o, 'thumbnailUrl', 'ThumbnailUrl')
+  if (!thumbnailUrl && media?.length) {
+    const first = media[0]
+    if (first && typeof first === 'object') {
+      const m = first as Record<string, unknown>
+      const url = m.url ?? m.URL
+      thumbnailUrl = typeof url === 'string' ? url : undefined
+    }
+  }
+
+  return {
+    id,
+    name,
+    description: pickStr(o, 'description', 'Description'),
+    sku: pickStr(o, 'sku', 'Sku'),
+    basePrice: pickNum(o, 'basePrice', 'BasePrice'),
+    discountPrice: pickNumOrNull(o, 'discountPrice', 'DiscountPrice'),
+    hasSpecialDiscount: pickBool(o, 'hasSpecialDiscount', 'HasSpecialDiscount'),
+    discountExpiry: (() => {
+      const v = o.discountExpiry ?? o.DiscountExpiry
+      if (v === null) return null
+      if (typeof v === 'string') return v
+      return undefined
+    })(),
+    stockQuantity: pickNum(o, 'stockQuantity', 'StockQuantity'),
+    isOutOfStock: pickBool(o, 'isOutOfStock', 'IsOutOfStock'),
+    thumbnailUrl,
+    brandId: pickStr(o, 'brandId', 'BrandId'),
+    categoryId: pickStr(o, 'categoryId', 'CategoryId'),
+    brand:
+      o.brand && typeof o.brand === 'object'
+        ? (o.brand as CatalogProductRow['brand'])
+        : undefined,
+    category:
+      o.category && typeof o.category === 'object'
+        ? (o.category as CatalogProductRow['category'])
+        : undefined,
+    seo,
+    status,
+    variants,
+    media,
+  }
+}
+
 /** Loose shape: catalog and admin responses may differ slightly. */
 export type CatalogProductRow = {
   id: string
@@ -98,14 +244,16 @@ export async function fetchCatalogProducts(
   // Public catalog: no draft filter in Postman; params.publication ignored here.
 
   const raw = await request<unknown>(`/api/v1/catalog/products?${q}`)
-  const items = arrayFromPayload(raw, ['items', 'products', 'data']) as CatalogProductRow[]
+  const rawItems = arrayFromPayload(raw, ['items', 'products', 'data'])
+  const items = rawItems.map((row) => normalizeCatalogProductRow(row))
   const total = totalFromPayload(raw, items.length)
   return { items, total }
 }
 
 export async function fetchCatalogProductByKey(productKey: string): Promise<CatalogProductRow> {
   const encoded = encodeURIComponent(productKey)
-  return request<CatalogProductRow>(`/api/v1/catalog/products/${encoded}`, { method: 'GET' })
+  const raw = await request<unknown>(`/api/v1/catalog/products/${encoded}`, { method: 'GET' })
+  return normalizeCatalogProductRow(raw)
 }
 
 /**
@@ -139,7 +287,8 @@ export async function fetchProductsList(
   if (token) {
     try {
       const raw = await request<unknown>(`/api/v1/products?${q}`, { method: 'GET', token })
-      const items = arrayFromPayload(raw, ['items', 'products', 'data']) as CatalogProductRow[]
+      const rawItems = arrayFromPayload(raw, ['items', 'products', 'data'])
+      const items = rawItems.map((row) => normalizeCatalogProductRow(row))
       const total = totalFromPayload(raw, items.length)
       return { items, total }
     } catch (e) {
