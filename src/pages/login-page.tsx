@@ -80,12 +80,12 @@ export function LoginPage() {
     }
     setLoading(true)
     try {
-      const { token } = await verifyAdminOtp({
+      const { token, refresh_token } = await verifyAdminOtp({
         phone: trimmedPhone,
         otp: trimmedOtp,
         request_id: requestId,
       })
-      login(token)
+      login(token, refresh_token)
       navigate('/dashboard', { replace: true })
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Sign in failed')

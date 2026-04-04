@@ -69,6 +69,34 @@ const PromotionDetailPage = lazy(() =>
   import('./pages/promotion-detail-page').then((m) => ({ default: m.PromotionDetailPage })),
 )
 
+const OrderLifecyclePage = lazy(() =>
+  import('./pages/order-lifecycle-page').then((m) => ({ default: m.OrderLifecyclePage })),
+)
+
+const CouponsPage = lazy(() =>
+  import('./pages/coupons-page').then((m) => ({ default: m.CouponsPage })),
+)
+
+const CouponDetailPage = lazy(() =>
+  import('./pages/coupon-detail-page').then((m) => ({ default: m.CouponDetailPage })),
+)
+
+const CouponEditorPage = lazy(() =>
+  import('./pages/coupon-editor-page').then((m) => ({ default: m.CouponEditorPage })),
+)
+
+const CustomersPage = lazy(() =>
+  import('./pages/customers-page').then((m) => ({ default: m.CustomersPage })),
+)
+
+const CustomerDetailPage = lazy(() =>
+  import('./pages/customer-detail-page').then((m) => ({ default: m.CustomerDetailPage })),
+)
+
+const CustomerEditorPage = lazy(() =>
+  import('./pages/customer-editor-page').then((m) => ({ default: m.CustomerEditorPage })),
+)
+
 const pageFallback = (
   <div className="flex min-h-[40vh] items-center justify-center text-sm text-slate-500 dark:text-slate-400">
     Loading…
@@ -243,6 +271,70 @@ function App() {
                   element={
                     <Suspense fallback={pageFallback}>
                       <PromotionDetailPage />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="/order-lifecycle"
+                  element={
+                    <Suspense fallback={pageFallback}>
+                      <OrderLifecyclePage />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="/coupons"
+                  element={
+                    <Suspense fallback={pageFallback}>
+                      <CouponsPage />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="/coupons/new"
+                  element={
+                    <Suspense fallback={pageFallback}>
+                      <CouponEditorPage />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="/coupons/:couponId/edit"
+                  element={
+                    <Suspense fallback={pageFallback}>
+                      <CouponEditorPage />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="/coupons/:couponId"
+                  element={
+                    <Suspense fallback={pageFallback}>
+                      <CouponDetailPage />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="/customers"
+                  element={
+                    <Suspense fallback={pageFallback}>
+                      <CustomersPage />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="/customers/:customerId"
+                  element={
+                    <Suspense fallback={pageFallback}>
+                      <CustomerDetailPage />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="/customers/:customerId/edit"
+                  element={
+                    <Suspense fallback={pageFallback}>
+                      <CustomerEditorPage />
                     </Suspense>
                   }
                 />

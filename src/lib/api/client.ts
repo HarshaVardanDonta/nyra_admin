@@ -1,10 +1,17 @@
 import { getApiBaseUrl } from '../../config/env'
-import { ApiError, toApiError } from './errors'
+import {
+  ApiError,
+  isInvalidAccessTokenResponse,
+  toApiError,
+} from './errors'
+import { refreshSession } from './session'
 
 export type RequestOptions = Omit<RequestInit, 'body' | 'headers'> & {
   body?: unknown
   token?: string | null
   headers?: HeadersInit
+  /** When true, 401 invalid token will not trigger refresh (avoids recursion on auth endpoints). */
+  skipAuthRefresh?: boolean
 }
 
 function joinUrl(base: string, path: string): string {
@@ -12,8 +19,18 @@ function joinUrl(base: string, path: string): string {
   return `${base}${p}`
 }
 
-export async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
-  const { body, token, headers: initHeaders, ...rest } = options
+async function requestInner<T>(
+  path: string,
+  options: RequestOptions,
+  authRetried: boolean,
+): Promise<T> {
+  const {
+    body,
+    token,
+    headers: initHeaders,
+    skipAuthRefresh,
+    ...rest
+  } = options
   const base = getApiBaseUrl()
   const url = joinUrl(base, path)
 
@@ -63,6 +80,21 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
   }
 
   if (!res.ok) {
+    if (
+      !skipAuthRefresh &&
+      !authRetried &&
+      token &&
+      isInvalidAccessTokenResponse(res.status, parsed)
+    ) {
+      const newToken = await refreshSession()
+      if (newToken) {
+        return requestInner<T>(
+          path,
+          { ...options, token: newToken },
+          true,
+        )
+      }
+    }
     throw toApiError(res.status, parsed, res.statusText)
   }
 
@@ -71,4 +103,84 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
   }
 
   return (isJson ? parsed : text) as T
+}
+
+export async function request<T>(
+  path: string,
+  options: RequestOptions = {},
+): Promise<T> {
+  return requestInner<T>(path, options, false)
+}
+
+export type AuthorizedFetchInit = {
+  method?: string
+  headers?: HeadersInit
+  token?: string | null
+  skipAuthRefresh?: boolean
+}
+
+/**
+ * GET (or other) fetch that retries once after refreshing the access token on 401 invalid token.
+ * Returns the successful `Response` (caller reads body).
+ */
+export async function fetchWithAuthRetry(
+  path: string,
+  init: AuthorizedFetchInit = {},
+  authRetried = false,
+): Promise<Response> {
+  const { method = 'GET', headers: initHeaders, token, skipAuthRefresh } =
+    init
+  const base = getApiBaseUrl()
+  const url = joinUrl(base, path)
+  const headers = new Headers(initHeaders)
+  if (token) {
+    headers.set('Authorization', `Bearer ${token}`)
+  }
+
+  let res: Response
+  try {
+    res = await fetch(url, { method, headers })
+  } catch (e) {
+    const msg =
+      e instanceof Error ? e.message : 'Could not reach the server'
+    throw new ApiError(`Network error: ${msg}`, 0)
+  }
+
+  if (res.ok) {
+    return res
+  }
+
+  const contentType = res.headers.get('Content-Type') ?? ''
+  const isJson = contentType.includes('application/json')
+  const text = await res.text()
+  let parsed: unknown
+  if (!text) {
+    parsed = undefined
+  } else if (isJson) {
+    try {
+      parsed = JSON.parse(text) as unknown
+    } catch {
+      parsed = text
+    }
+  } else {
+    parsed = text
+  }
+
+  if (
+    !skipAuthRefresh &&
+    !authRetried &&
+    token &&
+    isInvalidAccessTokenResponse(res.status, parsed)
+  ) {
+    const newToken = await refreshSession()
+    if (newToken) {
+      return fetchWithAuthRetry(
+        path,
+        { ...init, token: newToken },
+        true,
+      )
+    }
+  }
+
+  throw toApiError(res.status, parsed, res.statusText)
 }

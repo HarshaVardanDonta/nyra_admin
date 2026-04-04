@@ -1,6 +1,4 @@
-import { getApiBaseUrl } from '../../config/env'
-import { toApiError } from './errors'
-import { request } from './client'
+import { fetchWithAuthRetry, request } from './client'
 
 export type AnalyticsPeriod = '7d' | '30d' | '1y'
 
@@ -114,25 +112,13 @@ export async function downloadAnalyticsExport(
   token: string,
   period: AnalyticsPeriod,
 ): Promise<void> {
-  const base = getApiBaseUrl()
   const path = `/api/v1/analytics/export?period=${encodeURIComponent(period)}`
-  const url = base ? `${base.replace(/\/+$/, '')}${path}` : path
 
-  const res = await fetch(url, {
+  const res = await fetchWithAuthRetry(path, {
     method: 'GET',
-    headers: { Authorization: `Bearer ${token}` },
+    headers: { Accept: 'text/csv, */*' },
+    token,
   })
-
-  if (!res.ok) {
-    const text = await res.text()
-    let body: unknown
-    try {
-      body = text ? JSON.parse(text) : undefined
-    } catch {
-      body = text
-    }
-    throw toApiError(res.status, body)
-  }
 
   const blob = await res.blob()
   const fromHeader =

@@ -19,6 +19,7 @@ export type VerifyAdminParams = {
 
 export type VerifyResponse = {
   token: string
+  refresh_token: string
 }
 
 export async function verifyAdminOtp(
