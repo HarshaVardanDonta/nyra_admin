@@ -21,22 +21,34 @@ function messageFromBody(body: unknown): string | null {
     const e = nestedErr as Record<string, unknown>
     const nm = e.message
     if (typeof nm === 'string' && nm.trim()) return nm
+    const code = e.code
+    if (typeof code === 'string' && code.trim()) return code
   }
 
   const m = o.message ?? o.detail
-  if (typeof m === 'string') return m
+  if (typeof m === 'string') return m.trim() ? m : null
   if (Array.isArray(m) && typeof m[0] === 'string') return m.join(', ')
   return null
 }
 
-export function toApiError(status: number, body: unknown): ApiError {
+export function toApiError(status: number, body: unknown, statusText?: string): ApiError {
   const fromBody = messageFromBody(body)
-  const message = fromBody ?? `Request failed (${status})`
+  const st = statusText?.trim()
+  const message =
+    (fromBody && fromBody.trim()) ||
+    (st ? `${status} ${st}` : '') ||
+    `Request failed (${status})`
   return new ApiError(message, status, body)
 }
 
 export function getErrorMessage(err: unknown): string {
-  if (err instanceof ApiError) return err.message
-  if (err instanceof Error) return err.message
+  if (err instanceof ApiError) {
+    const m = err.message?.trim()
+    return m || `Request failed (${err.status})`
+  }
+  if (err instanceof Error) {
+    const m = err.message?.trim()
+    return m || 'Something went wrong'
+  }
   return 'Something went wrong'
 }

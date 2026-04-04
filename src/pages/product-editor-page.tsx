@@ -12,6 +12,7 @@ import {
 } from '../lib/api/catalog'
 import {
   createProduct,
+  normalizeProductMediaForApi,
   parseInrInputToRupees,
   rupeesToFormString,
   updateProduct,
@@ -332,8 +333,9 @@ export function ProductEditorPage() {
     fd.set('variants', JSON.stringify(buildVariantsPayload()))
     fd.set('seo', JSON.stringify(buildSeo()))
     fd.set('status', JSON.stringify(buildStatus(published)))
-    if (mediaJsonInput.trim()) {
-      fd.set('mediaJson', mediaJsonInput.trim())
+    const mergedMedia = normalizeProductMediaForApi(mediaPayloadForJsonPatch())
+    if (mergedMedia.length > 0) {
+      fd.set('mediaJson', JSON.stringify(mergedMedia))
     }
     for (const file of mediaFiles.slice(0, 10)) {
       fd.append('media', file)
@@ -359,30 +361,8 @@ export function ProductEditorPage() {
     setSaving(true)
     try {
       if (isEdit && productId) {
-        if (mediaFiles.length > 0) {
-          await updateProduct(token, productId, buildProductFormData(published))
-        } else {
-          const body: Record<string, unknown> = {
-            name: name.trim(),
-            description: description.trim(),
-            brandId,
-            categoryId,
-            basePrice: parseInrInputToRupees(basePriceRupees),
-            discountPrice: parseInrInputToRupees(discountPriceRupees),
-            hasSpecialDiscount,
-            discountExpiry: discountExpiry
-              ? new Date(discountExpiry + 'T12:00:00Z').toISOString()
-              : null,
-            sku: sku.trim(),
-            stockQuantity: Number.parseInt(stockQuantity, 10) || 0,
-            isOutOfStock,
-            media: mediaPayloadForJsonPatch(),
-            variants: buildVariantsPayload(),
-            seo: buildSeo(),
-            status: buildStatus(published),
-          }
-          await updateProduct(token, productId, body)
-        }
+        // Multipart only: this backend matches the working Postman/curl flow; JSON PATCH can fail silently.
+        await updateProduct(token, productId, buildProductFormData(published))
         showToast(published ? 'Product published' : 'Draft saved', 'success')
         navigate('/products')
       } else {
@@ -840,21 +820,23 @@ export function ProductEditorPage() {
             Discard changes
           </button>
           <div className="flex gap-2">
-            <button
-              type="button"
-              disabled={saving}
-              onClick={() => void handleSubmit('draft')}
-              className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-800 transition hover:bg-slate-50 disabled:opacity-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
-            >
-              Save Draft
-            </button>
+            {!isEdit ? (
+              <button
+                type="button"
+                disabled={saving}
+                onClick={() => void handleSubmit('draft')}
+                className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-800 transition hover:bg-slate-50 disabled:opacity-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+              >
+                Save Draft
+              </button>
+            ) : null}
             <button
               type="button"
               disabled={saving || !ready}
               onClick={() => void handleSubmit('publish')}
               className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-blue-500 disabled:opacity-50"
             >
-              Publish Product
+              {isEdit ? 'Save changes' : 'Publish Product'}
             </button>
           </div>
         </div>

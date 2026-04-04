@@ -18,6 +18,9 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
   const url = joinUrl(base, path)
 
   const headers = new Headers(initHeaders)
+  if (!headers.has('Accept')) {
+    headers.set('Accept', 'application/json')
+  }
   if (body !== undefined && !(body instanceof FormData)) {
     headers.set('Content-Type', 'application/json')
   }
@@ -60,7 +63,7 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
   }
 
   if (!res.ok) {
-    throw toApiError(res.status, parsed)
+    throw toApiError(res.status, parsed, res.statusText)
   }
 
   if (res.status === 204 || text === '') {

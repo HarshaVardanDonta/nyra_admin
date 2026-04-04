@@ -11,19 +11,6 @@ function arrayFromPayload(raw: unknown, keys: string[]): unknown[] {
   return []
 }
 
-function totalFromPayload(raw: unknown, itemsLen: number): number {
-  if (!raw || typeof raw !== 'object') return itemsLen
-  const o = raw as Record<string, unknown>
-  const t = o.total ?? o.totalCount ?? o.count
-  if (typeof t === 'number' && Number.isFinite(t)) return t
-  const meta = o.meta
-  if (meta && typeof meta === 'object') {
-    const mt = (meta as Record<string, unknown>).total
-    if (typeof mt === 'number' && Number.isFinite(mt)) return mt
-  }
-  return itemsLen
-}
-
 function pickStr(o: Record<string, unknown>, ...keys: string[]): string | undefined {
   for (const k of keys) {
     const v = o[k]
@@ -152,82 +139,46 @@ export type CategoryListParams = {
 }
 
 /**
- * Prefer `GET /api/v1/categories` when the admin stack exposes it; otherwise load the public
- * catalog tree and filter client-side (search / status / parent).
+ * `GET /api/v1/catalog/categories` with optional client-side filters.
+ * Nyra admin exposes `POST` / `PATCH` for categories only (no `GET /api/v1/categories`).
  */
 export async function fetchCategoriesList(
-  token: string | null,
+  _token: string | null,
   params: CategoryListParams,
 ): Promise<{ items: CategoryRecord[]; total: number }> {
-  const q = new URLSearchParams({
-    limit: String(params.limit),
-    offset: String(params.offset),
-  })
-  if (params.search?.trim()) q.set('search', params.search.trim())
   const st = params.status ?? 'all'
-  if (st === 'active') {
-    q.set('isActive', 'true')
-    q.set('is_active', 'true')
-  } else if (st === 'inactive') {
-    q.set('isActive', 'false')
-    q.set('is_active', 'false')
-  }
   const scope = params.parentScope
-  if (scope === 'root') q.set('root', 'true')
-  else if (scope && scope !== 'all') q.set('parentId', scope)
 
-  if (token) {
-    try {
-      const raw = await request<unknown>(`/api/v1/categories?${q}`, { method: 'GET', token })
-      const items = mapListItems(raw)
-      const total = totalFromPayload(raw, items.length)
-      return { items, total }
-    } catch (e) {
-      if (e instanceof ApiError && (e.status === 404 || e.status === 405)) {
-        /* catalog fallback */
-      } else {
-        throw e
-      }
+  const fromCatalog = async (): Promise<{ items: CategoryRecord[]; total: number }> => {
+    const cq = new URLSearchParams({ limit: '500', offset: '0' })
+    if (scope === 'root') cq.set('root', 'true')
+    else if (scope && scope !== 'all') cq.set('parentId', scope)
+    const raw = await request<unknown>(`/api/v1/catalog/categories?${cq}`, { method: 'GET' })
+    let items = mapListItems(raw)
+    const search = params.search?.trim().toLowerCase()
+    if (search) {
+      items = items.filter((c) => {
+        const hay = `${c.name} ${c.slug ?? ''}`.toLowerCase()
+        return hay.includes(search)
+      })
     }
+    if (st === 'active') items = items.filter((c) => c.isActive !== false)
+    if (st === 'inactive') items = items.filter((c) => c.isActive === false)
+    if (scope === 'root') {
+      items = items.filter((c) => !c.parentCategoryId)
+    }
+    const total = items.length
+    const start = params.offset
+    const end = start + params.limit
+    return { items: items.slice(start, end), total }
   }
 
-  const cq = new URLSearchParams({ limit: '500', offset: '0' })
-  if (scope === 'root') cq.set('root', 'true')
-  else if (scope && scope !== 'all') cq.set('parentId', scope)
-  const raw = await request<unknown>(`/api/v1/catalog/categories?${cq}`, { method: 'GET' })
-  let items = mapListItems(raw)
-  const search = params.search?.trim().toLowerCase()
-  if (search) {
-    items = items.filter((c) => {
-      const hay = `${c.name} ${c.slug ?? ''}`.toLowerCase()
-      return hay.includes(search)
-    })
-  }
-  if (st === 'active') items = items.filter((c) => c.isActive !== false)
-  if (st === 'inactive') items = items.filter((c) => c.isActive === false)
-  if (scope === 'root') {
-    items = items.filter((c) => !c.parentCategoryId)
-  }
-  const total = items.length
-  const start = params.offset
-  const end = start + params.limit
-  return { items: items.slice(start, end), total }
+  return fromCatalog()
 }
 
 export async function fetchCategoryDetail(token: string | null, categoryKey: string): Promise<CategoryRecord> {
   const encoded = encodeURIComponent(categoryKey)
   let lastCatalogErr: unknown
-  if (token) {
-    try {
-      const raw = await request<unknown>(`/api/v1/categories/${encoded}`, { method: 'GET', token })
-      const row = normalizeCategoryRow(raw)
-      if (row) return row
-    } catch (e) {
-      if (!(e instanceof ApiError && (e.status === 404 || e.status === 405))) {
-        throw e
-      }
-    }
-  }
   try {
     const raw = await request<unknown>(`/api/v1/catalog/categories/${encoded}`, { method: 'GET' })
     const row = normalizeCategoryRow(raw)
@@ -270,29 +221,14 @@ export function categoryIdFromCreateResponse(res: unknown): string {
   return ''
 }
 
+/** Postman + Nyra API: `PATCH /api/v1/categories/:categoryID` (JSON or multipart). */
 async function requestCategoryUpdate(
   token: string,
   categoryId: string,
   body: Record<string, unknown> | FormData,
 ): Promise<unknown> {
   const encoded = encodeURIComponent(categoryId)
-  const attempts: { method: string; path: string }[] = [
-    { method: 'PATCH', path: `/api/v1/categories/${encoded}` },
-    { method: 'PUT', path: `/api/v1/categories/${encoded}` },
-    { method: 'PATCH', path: `/api/v1/catalog/categories/${encoded}` },
-    { method: 'PUT', path: `/api/v1/catalog/categories/${encoded}` },
-  ]
-  let lastErr: unknown
-  for (const { method, path } of attempts) {
-    try {
-      return await request(path, { method, token, body })
-    } catch (e) {
-      lastErr = e
-      if (e instanceof ApiError && (e.status === 404 || e.status === 405)) continue
-      throw e
-    }
-  }
-  throw lastErr
+  return request(`/api/v1/categories/${encoded}`, { method: 'PATCH', token, body })
 }
 
 export async function updateCategoryJson(
@@ -311,13 +247,7 @@ export async function updateCategoryMultipart(
   return requestCategoryUpdate(token, categoryId, formData)
 }
 
-export async function deleteCategory(token: string, categoryId: string): Promise<boolean> {
-  const encoded = encodeURIComponent(categoryId)
-  try {
-    await request(`/api/v1/categories/${encoded}`, { method: 'DELETE', token })
-    return true
-  } catch (e) {
-    if (e instanceof ApiError && (e.status === 404 || e.status === 405)) return false
-    throw e
-  }
+/** Admin catalog in Postman has no category delete route. */
+export async function deleteCategory(_token: string, _categoryId: string): Promise<boolean> {
+  return false
 }

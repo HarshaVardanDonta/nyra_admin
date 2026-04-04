@@ -181,11 +181,11 @@ export function AdminDrawer() {
           <NavRow to="/products" label="Products" icon="box" />
           <NavRow to="/categories" label="Categories" icon="folder" />
           <NavRow to="/brands" label="Brands" icon="tag" />
-          <NavRow label="Collections" icon="layers" disabled />
+          <NavRow to="/collections" label="Collections" icon="layers" />
         </NavGroup>
         <NavGroup title="Marketing">
           <NavRow label="Coupons" icon="ticket" disabled />
-          <NavRow label="Promotions" icon="megaphone" disabled />
+          <NavRow to="/promotions" label="Promotions" icon="megaphone" />
         </NavGroup>
         <NavGroup title="System">
           <NavRow label="Customers" icon="users" disabled />

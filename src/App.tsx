@@ -45,6 +45,30 @@ const CategoryDetailPage = lazy(() =>
   import('./pages/category-detail-page').then((m) => ({ default: m.CategoryDetailPage })),
 )
 
+const CollectionsPage = lazy(() =>
+  import('./pages/collections-page').then((m) => ({ default: m.CollectionsPage })),
+)
+
+const CollectionEditorPage = lazy(() =>
+  import('./pages/collection-editor-page').then((m) => ({ default: m.CollectionEditorPage })),
+)
+
+const CollectionDetailPage = lazy(() =>
+  import('./pages/collection-detail-page').then((m) => ({ default: m.CollectionDetailPage })),
+)
+
+const PromotionsPage = lazy(() =>
+  import('./pages/promotions-page').then((m) => ({ default: m.PromotionsPage })),
+)
+
+const PromotionEditorPage = lazy(() =>
+  import('./pages/promotion-editor-page').then((m) => ({ default: m.PromotionEditorPage })),
+)
+
+const PromotionDetailPage = lazy(() =>
+  import('./pages/promotion-detail-page').then((m) => ({ default: m.PromotionDetailPage })),
+)
+
 const pageFallback = (
   <div className="flex min-h-[40vh] items-center justify-center text-sm text-slate-500 dark:text-slate-400">
     Loading…
@@ -155,6 +179,70 @@ function App() {
                   element={
                     <Suspense fallback={pageFallback}>
                       <CategoryDetailPage />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="/collections"
+                  element={
+                    <Suspense fallback={pageFallback}>
+                      <CollectionsPage />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="/collections/new"
+                  element={
+                    <Suspense fallback={pageFallback}>
+                      <CollectionEditorPage />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="/collections/:collectionId/edit"
+                  element={
+                    <Suspense fallback={pageFallback}>
+                      <CollectionEditorPage />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="/collections/:collectionId"
+                  element={
+                    <Suspense fallback={pageFallback}>
+                      <CollectionDetailPage />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="/promotions"
+                  element={
+                    <Suspense fallback={pageFallback}>
+                      <PromotionsPage />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="/promotions/new"
+                  element={
+                    <Suspense fallback={pageFallback}>
+                      <PromotionEditorPage />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="/promotions/:promotionId/edit"
+                  element={
+                    <Suspense fallback={pageFallback}>
+                      <PromotionEditorPage />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="/promotions/:promotionId"
+                  element={
+                    <Suspense fallback={pageFallback}>
+                      <PromotionDetailPage />
                     </Suspense>
                   }
                 />

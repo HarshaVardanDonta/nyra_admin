@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useAuth } from '../contexts/use-auth'
 import { useToast } from '../contexts/use-toast'
 import {
@@ -223,16 +224,15 @@ export function DashboardPage() {
             </svg>
             Create Coupon
           </button>
-          <button
-            type="button"
-            onClick={() => showToast('Promotions are not available yet', 'info')}
+          <Link
+            to="/promotions"
             className="inline-flex items-center gap-2 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-800 px-4 py-2.5 text-sm font-medium text-slate-900 dark:text-slate-50 transition hover:border-slate-500"
           >
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M11 5L6 9H3v6h3l5 4V5z" />
             </svg>
             Promotion
-          </button>
+          </Link>
         </div>
       </header>
 

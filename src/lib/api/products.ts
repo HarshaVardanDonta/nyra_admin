@@ -35,6 +35,28 @@ export async function updateProduct(
   })
 }
 
+/** Use in PATCH bodies / mediaJson; catalog may return PascalCase (URL, Type, IsPrimary). */
+export function normalizeProductMediaForApi(
+  entries: unknown[],
+): { url: string; type: string; isPrimary: boolean }[] {
+  const out: { url: string; type: string; isPrimary: boolean }[] = []
+  for (const m of entries) {
+    if (!m || typeof m !== 'object') continue
+    const o = m as Record<string, unknown>
+    const url = o.url ?? o.URL
+    if (typeof url !== 'string' || !url.trim()) continue
+    const typeRaw = o.type ?? o.Type
+    const type = typeof typeRaw === 'string' && typeRaw.trim() ? typeRaw : 'image'
+    const ip = o.isPrimary ?? o.IsPrimary
+    out.push({
+      url: url.trim(),
+      type,
+      isPrimary: typeof ip === 'boolean' ? ip : ip === 'true',
+    })
+  }
+  return out
+}
+
 function coerceVariantValuesForPatch(raw: unknown): string[] {
   if (raw == null) return []
   if (Array.isArray(raw)) {
@@ -106,7 +128,7 @@ export function fullProductPatchFromListRow(
     sku: row.sku?.trim() || 'N/A',
     stockQuantity: row.stockQuantity ?? 0,
     isOutOfStock: amend?.isOutOfStock ?? row.isOutOfStock ?? false,
-    media: Array.isArray(row.media) ? row.media : [],
+    media: normalizeProductMediaForApi(Array.isArray(row.media) ? row.media : []),
     variants: variantsForProductPatch(row),
     seo: {
       slug: row.seo?.slug ?? '',

@@ -4,8 +4,9 @@ function normalizeBaseUrl(raw: string): string {
 
 /**
  * Base URL for API requests.
- * - Development: leave `VITE_API_BASE_URL` empty to use same-origin requests
- *   (Vite proxies `/api` and `/healthz` — avoids CORS preflight to the backend).
+ * - Development: set `VITE_API_BASE_URL` to the API origin (e.g. http://localhost:8080) so
+ *   the browser calls the backend directly. Leave it empty for same-origin requests; Vite
+ *   then proxies `/api` and `/healthz` to `VITE_API_PROXY_TARGET` (Network tab shows the dev server).
  * - Production: set to the full public API origin (no trailing slash).
  */
 export function getApiBaseUrl(): string {

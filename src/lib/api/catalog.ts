@@ -1,5 +1,4 @@
 import { request } from './client'
-import { ApiError } from './errors'
 
 export type CatalogBrand = {
   id: string
@@ -71,8 +70,10 @@ export function normalizeCatalogProductRow(raw: unknown): CatalogProductRow {
     return { id: '', name: '' }
   }
   const o = raw as Record<string, unknown>
-  const id = typeof o.id === 'string' ? o.id : o.id != null ? String(o.id) : ''
-  const name = typeof o.name === 'string' ? o.name : ''
+  const rawId = o.id ?? o.Id
+  const id = typeof rawId === 'string' ? rawId : rawId != null ? String(rawId) : ''
+  const name =
+    typeof o.name === 'string' ? o.name : typeof o.Name === 'string' ? o.Name : ''
 
   const seoRaw = o.seo
   let seo: CatalogProductRow['seo']
@@ -227,7 +228,7 @@ export type CatalogProductListParams = {
   categoryId?: string
   brandId?: string
   search?: string
-  /** Ask admin `GET /api/v1/products` to include drafts / unpublished rows. */
+  /** Client-side hint; Nyra has no `GET /api/v1/products` — list data always comes from the public catalog. */
   publication?: PublicationListFilter
 }
 
@@ -257,51 +258,22 @@ export async function fetchCatalogProductByKey(productKey: string): Promise<Cata
 }
 
 /**
- * Admin product index is not in the Postman collection; many backends expose GET /api/v1/products
- * alongside POST/PATCH. On 404/405 we fall back to the documented catalog list.
+ * `GET /api/v1/catalog/products` only (Postman public catalog). Admin catalog documents `POST` / `PATCH`
+ * for products, not a list endpoint — filtering by publication is applied client-side when the API ignores those query params.
  */
 export async function fetchProductsList(
-  token: string | null,
+  _token: string | null,
   params: CatalogProductListParams,
 ): Promise<{ items: CatalogProductRow[]; total: number }> {
-  const q = new URLSearchParams({
-    limit: String(params.limit),
-    offset: String(params.offset),
-  })
-  if (params.categoryId) q.set('categoryId', params.categoryId)
-  if (params.brandId) q.set('brandId', params.brandId)
-  if (params.search) q.set('search', params.search)
-
-  const pub = params.publication ?? 'all'
-  if (pub === 'published') {
-    q.set('isPublished', 'true')
-    q.set('is_published', 'true')
-  } else if (pub === 'unpublished') {
-    q.set('isPublished', 'false')
-    q.set('is_published', 'false')
-  } else {
-    q.set('includeUnpublished', 'true')
-    q.set('include_unpublished', 'true')
-  }
-
-  if (token) {
-    try {
-      const raw = await request<unknown>(`/api/v1/products?${q}`, { method: 'GET', token })
-      const rawItems = arrayFromPayload(raw, ['items', 'products', 'data'])
-      const items = rawItems.map((row) => normalizeCatalogProductRow(row))
-      const total = totalFromPayload(raw, items.length)
-      return { items, total }
-    } catch (e) {
-      if (e instanceof ApiError && (e.status === 404 || e.status === 405)) {
-        /* fall through */
-      } else {
-        throw e
-      }
-    }
-  }
-
   const { items, total } = await fetchCatalogProducts(params)
-  return { items, total }
+  const pub = params.publication ?? 'all'
+  if (pub === 'all') return { items, total }
+  const filtered = items.filter((row) => {
+    const published = row.status?.isPublished !== false
+    return pub === 'published' ? published : !published
+  })
+  const fullPageKept = filtered.length === items.length
+  return { items: filtered, total: fullPageKept ? total : filtered.length }
 }
 
 export function categoryBreadcrumb(

@@ -135,8 +135,8 @@ export type BrandListParams = {
 }
 
 /**
- * Prefer authenticated `GET /api/v1/brands` when available; fall back to public catalog list
- * (`GET /api/v1/catalog/brands`) which returns active brands only.
+ * List brands: public `GET /api/v1/catalog/brands` when unauthenticated (active storefront only).
+ * With an admin token, `GET /api/v1/brands` lists every brand including inactive (Postman Admin Catalog).
  */
 export async function fetchBrandsList(
   token: string | null,
@@ -156,7 +156,17 @@ export async function fetchBrandsList(
     q.set('is_active', 'false')
   }
 
-  if (token) {
+  const fromCatalog = async (): Promise<{ items: BrandRecord[]; total: number }> => {
+    const raw = await request<unknown>(`/api/v1/catalog/brands?${q}`, { method: 'GET' })
+    let items = mapListItems(raw)
+    if (st === 'inactive') {
+      items = []
+    }
+    const total = totalFromPayload(raw, items.length)
+    return { items, total }
+  }
+
+  if (token && st === 'inactive') {
     try {
       const raw = await request<unknown>(`/api/v1/brands?${q}`, { method: 'GET', token })
       const items = mapListItems(raw)
@@ -164,39 +174,21 @@ export async function fetchBrandsList(
       return { items, total }
     } catch (e) {
       if (e instanceof ApiError && (e.status === 404 || e.status === 405)) {
-        /* use catalog */
+        /* catalog cannot list inactive; return empty */
       } else {
         throw e
       }
     }
+    return fromCatalog()
   }
 
-  const raw = await request<unknown>(`/api/v1/catalog/brands?${q}`, { method: 'GET' })
-  let items = mapListItems(raw)
-  if (st === 'inactive') {
-    items = []
-  } else if (st === 'active' || st === 'all') {
-    // catalog is active-only; keep as-is
-  }
-  const total = totalFromPayload(raw, items.length)
-  return { items, total }
+  return fromCatalog()
 }
 
-/** Single brand: try admin by id, then public catalog by id or slug. */
+/** Single brand: `GET /api/v1/catalog/brands/:brandKey`; inactive-only rows resolve via admin list (no admin GET-by-id route). */
 export async function fetchBrandDetail(token: string | null, brandKey: string): Promise<BrandRecord> {
   const encoded = encodeURIComponent(brandKey)
   let lastCatalogErr: unknown
-  if (token) {
-    try {
-      const raw = await request<unknown>(`/api/v1/brands/${encoded}`, { method: 'GET', token })
-      const row = normalizeBrandRow(raw)
-      if (row) return row
-    } catch (e) {
-      if (!(e instanceof ApiError && (e.status === 404 || e.status === 405))) {
-        throw e
-      }
-    }
-  }
   try {
     const raw = await request<unknown>(`/api/v1/catalog/brands/${encoded}`, { method: 'GET' })
     const row = normalizeBrandRow(raw)
@@ -242,39 +234,14 @@ export function brandIdFromCreateResponse(res: unknown): string {
 
 type BrandUpdateBody = Record<string, unknown> | FormData
 
-/**
- * Backends differ: Postman documents PATCH on `/api/v1/brands/:id`, but some stacks
- * only register PUT (like other admin resources) or mount updates under `/catalog/brands/`.
- * Try a short chain and surface the last error if nothing matches.
- */
+/** Postman + Nyra API: `PATCH /api/v1/brands/:brandID` (JSON or multipart). */
 async function requestBrandUpdate(
   token: string,
   brandId: string,
   body: BrandUpdateBody,
 ): Promise<unknown> {
   const encoded = encodeURIComponent(brandId)
-  const attempts: { method: string; path: string }[] = [
-    { method: 'PATCH', path: `/api/v1/brands/${encoded}` },
-    { method: 'PUT', path: `/api/v1/brands/${encoded}` },
-    { method: 'PATCH', path: `/api/v1/brand/${encoded}` },
-    { method: 'PUT', path: `/api/v1/brand/${encoded}` },
-    { method: 'PATCH', path: `/api/v1/catalog/brands/${encoded}` },
-    { method: 'PUT', path: `/api/v1/catalog/brands/${encoded}` },
-  ]
-
-  let lastErr: unknown
-  for (const { method, path } of attempts) {
-    try {
-      return await request(path, { method, token, body })
-    } catch (e) {
-      lastErr = e
-      if (e instanceof ApiError && (e.status === 404 || e.status === 405)) {
-        continue
-      }
-      throw e
-    }
-  }
-  throw lastErr
+  return request(`/api/v1/brands/${encoded}`, { method: 'PATCH', token, body })
 }
 
 export async function updateBrandJson(
@@ -293,15 +260,7 @@ export async function updateBrandMultipart(
   return requestBrandUpdate(token, brandId, formData)
 }
 
-export async function deleteBrand(token: string, brandId: string): Promise<boolean> {
-  const encoded = encodeURIComponent(brandId)
-  try {
-    await request(`/api/v1/brands/${encoded}`, { method: 'DELETE', token })
-    return true
-  } catch (e) {
-    if (e instanceof ApiError && (e.status === 404 || e.status === 405)) {
-      return false
-    }
-    throw e
-  }
+/** Admin catalog in Postman has no brand delete route. */
+export async function deleteBrand(_token: string, _brandId: string): Promise<boolean> {
+  return false
 }
