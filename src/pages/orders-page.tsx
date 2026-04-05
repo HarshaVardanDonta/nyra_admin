@@ -240,7 +240,7 @@ export function OrdersPage() {
   const toIdx = Math.min(pagination.page * pagination.perPage, pagination.total)
 
   return (
-    <div className="p-6 pb-28 text-slate-900 dark:text-slate-50 lg:p-10">
+    <div className="min-w-0 px-4 pt-6 pb-28 text-slate-900 dark:text-slate-50 sm:px-6 lg:p-10">
       <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Orders</h1>
@@ -265,8 +265,8 @@ export function OrdersPage() {
         </button>
       </div>
 
-      <div className="mb-6 flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-[#111827] lg:flex-row lg:flex-wrap lg:items-center">
-        <div className="relative min-w-[200px] flex-1">
+      <div className="mb-6 flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-[#111827] lg:flex-row lg:flex-wrap lg:items-center [&>select]:min-w-[12rem] [&>select]:max-w-full [&>select]:shrink-0">
+        <div className="relative min-w-0 flex-1 lg:min-w-[200px]">
           <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z" />
@@ -283,7 +283,7 @@ export function OrdersPage() {
         <select
           value={statusId}
           onChange={(e) => setStatusId(e.target.value)}
-          className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-900"
+          className="select-tail w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-900 lg:w-auto"
         >
           <option value="">All statuses</option>
           {statusOptions.map((s) => (
@@ -295,7 +295,7 @@ export function OrdersPage() {
         <select
           value={period ?? '30d'}
           onChange={(e) => setPeriod(e.target.value as OrdersListParams['period'])}
-          className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-900"
+          className="select-tail w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-900 lg:w-auto"
         >
           {PERIOD_OPTIONS.map((o) => (
             <option key={o.value} value={o.value ?? ''}>
@@ -306,7 +306,7 @@ export function OrdersPage() {
         <select
           value={customerId}
           onChange={(e) => setCustomerId(e.target.value)}
-          className="min-w-[160px] rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-900"
+          className="select-tail w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-900 lg:w-auto"
         >
           <option value="">All customers</option>
           {customerOptions.map((c) => (
@@ -318,7 +318,7 @@ export function OrdersPage() {
         <select
           value={paymentStatus}
           onChange={(e) => setPaymentStatus(e.target.value)}
-          className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-900"
+          className="select-tail w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-900 lg:w-auto"
         >
           {PAYMENT_FILTER_OPTIONS.map((o) => (
             <option key={o.value || 'all'} value={o.value}>

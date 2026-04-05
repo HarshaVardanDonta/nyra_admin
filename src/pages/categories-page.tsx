@@ -97,7 +97,7 @@ export function CategoriesPage() {
   )
 
   return (
-    <div className="p-6 pb-28 text-slate-900 dark:text-slate-50 lg:p-10">
+    <div className="min-w-0 px-4 pt-6 pb-28 text-slate-900 dark:text-slate-50 sm:px-6 lg:p-10">
       <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Categories</h1>
@@ -140,14 +140,14 @@ export function CategoriesPage() {
               className="w-full rounded-lg border border-slate-200 bg-slate-50 py-2.5 pl-10 pr-3 text-sm outline-none ring-blue-500/30 focus:border-blue-500 focus:ring-2 dark:border-slate-700 dark:bg-slate-900/80"
             />
           </div>
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2 [&_select]:min-w-[12rem] [&_select]:max-w-full [&_select]:shrink-0">
             <span className="text-[10px] font-semibold uppercase tracking-widest text-slate-400 dark:text-slate-500">
               Filter by
             </span>
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
-              className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900"
+              className="select-tail rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900"
             >
               <option value="all">Status: All</option>
               <option value="active">Active</option>
@@ -156,7 +156,7 @@ export function CategoriesPage() {
             <select
               value={parentScope}
               onChange={(e) => setParentScope(e.target.value)}
-              className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900"
+              className="select-tail rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900"
             >
               <option value="">Parent: All</option>
               <option value="__root__">Top level</option>

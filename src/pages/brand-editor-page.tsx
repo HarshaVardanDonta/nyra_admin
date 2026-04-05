@@ -282,7 +282,7 @@ export function BrandEditorPage() {
   }
 
   return (
-    <div className="p-6 pb-28 text-slate-900 dark:text-slate-50 lg:p-10">
+    <div className="min-w-0 px-4 pt-6 pb-28 text-slate-900 dark:text-slate-50 sm:px-6 lg:p-10">
       <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">
@@ -310,7 +310,7 @@ export function BrandEditorPage() {
         </div>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
+      <div className="min-w-0 grid gap-6 lg:grid-cols-[1fr_320px]">
         <div className="flex flex-col gap-6">
           <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-[#0f1419]">
             <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Basic Information</h2>

@@ -193,7 +193,7 @@ export function CustomersPage() {
   }
 
   return (
-    <div className="p-6 pb-28 text-slate-900 dark:text-slate-50 lg:p-10">
+    <div className="min-w-0 px-4 pt-6 pb-28 text-slate-900 dark:text-slate-50 sm:px-6 lg:p-10">
       <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Customers</h1>
@@ -269,7 +269,7 @@ export function CustomersPage() {
                   id="cust-sort-by"
                   value={sortBy}
                   onChange={(e) => setSortBy(e.target.value)}
-                  className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2 py-2 text-sm dark:border-slate-700 dark:bg-slate-800"
+                  className="select-tail mt-1 w-full rounded-lg border border-slate-200 bg-white px-2 py-2 text-sm dark:border-slate-700 dark:bg-slate-800"
                 >
                   {SORT_OPTIONS.map((o) => (
                     <option key={o.value} value={o.value}>
@@ -284,7 +284,7 @@ export function CustomersPage() {
                   id="cust-sort-dir"
                   value={sortDir}
                   onChange={(e) => setSortDir(e.target.value as 'asc' | 'desc')}
-                  className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2 py-2 text-sm dark:border-slate-700 dark:bg-slate-800"
+                  className="select-tail mt-1 w-full rounded-lg border border-slate-200 bg-white px-2 py-2 text-sm dark:border-slate-700 dark:bg-slate-800"
                 >
                   <option value="desc">Descending</option>
                   <option value="asc">Ascending</option>

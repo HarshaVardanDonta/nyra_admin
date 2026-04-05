@@ -10,22 +10,8 @@ import {
   type CouponDiscountType,
   type CouponWriteInput,
 } from '../lib/api/coupons'
-
-function isoToDatetimeLocal(iso: string | undefined): string {
-  if (!iso) return ''
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return ''
-  const pad = (n: number) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
-}
-
-function datetimeLocalToIso(local: string): string | undefined {
-  const t = local.trim()
-  if (!t) return undefined
-  const d = new Date(t)
-  if (Number.isNaN(d.getTime())) return undefined
-  return d.toISOString()
-}
+import { AdminDateTimeField } from '../components/admin-date-field'
+import { datetimeLocalToIso, isoToDatetimeLocal } from '../lib/datetime-local'
 
 function parseOptionalPositiveInt(s: string): number | undefined {
   const t = s.trim()
@@ -327,7 +313,7 @@ export function CouponEditorPage() {
   }
 
   return (
-    <div className="p-6 pb-32 text-slate-900 dark:text-slate-50 lg:p-10">
+    <div className="min-w-0 px-4 pt-6 pb-32 text-slate-900 dark:text-slate-50 sm:px-6 lg:p-10">
       <form onSubmit={(ev) => void handleSubmit(ev)}>
         <nav className="mb-4 text-[11px] font-semibold uppercase tracking-widest text-blue-600 dark:text-blue-400">
           <Link to="/coupons" className="transition hover:underline">
@@ -442,7 +428,7 @@ export function CouponEditorPage() {
                   id={`${baseId}-dtype`}
                   value={discountType}
                   onChange={(e) => setDiscountType(e.target.value === 'fixed' ? 'fixed' : 'percentage')}
-                  className={inputClass()}
+                  className={`${inputClass()} select-tail`}
                 >
                   <option value="percentage">Percentage (%)</option>
                   <option value="fixed">Fixed amount (₹)</option>
@@ -556,25 +542,13 @@ export function CouponEditorPage() {
                 <label htmlFor={`${baseId}-start`} className="mb-1.5 block text-xs font-medium text-slate-500 dark:text-slate-400">
                   Start date &amp; time
                 </label>
-                <input
-                  id={`${baseId}-start`}
-                  type="datetime-local"
-                  value={startLocal}
-                  onChange={(e) => setStartLocal(e.target.value)}
-                  className={inputClass()}
-                />
+                <AdminDateTimeField id={`${baseId}-start`} value={startLocal} onChange={setStartLocal} className={inputClass()} />
               </div>
               <div>
                 <label htmlFor={`${baseId}-end`} className="mb-1.5 block text-xs font-medium text-slate-500 dark:text-slate-400">
                   Expiration date &amp; time
                 </label>
-                <input
-                  id={`${baseId}-end`}
-                  type="datetime-local"
-                  value={endLocal}
-                  onChange={(e) => setEndLocal(e.target.value)}
-                  className={inputClass()}
-                />
+                <AdminDateTimeField id={`${baseId}-end`} value={endLocal} onChange={setEndLocal} className={inputClass()} />
               </div>
             </div>
           </SectionCard>

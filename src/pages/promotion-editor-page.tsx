@@ -13,6 +13,8 @@ import {
   type PromotionWriteInput,
 } from '../lib/api/promotions'
 import { resolveMediaUrl } from '../lib/media-url'
+import { datetimeLocalToIso, isoToDatetimeLocal } from '../lib/datetime-local'
+import { AdminDateTimeField } from '../components/admin-date-field'
 
 const MAX_BYTES = 2 * 1024 * 1024
 
@@ -27,22 +29,6 @@ function cleanStoredMediaUrl(url: string): string {
     return t
   }
   return t
-}
-
-function isoToDatetimeLocal(iso: string | undefined): string {
-  if (!iso) return ''
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return ''
-  const pad = (n: number) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
-}
-
-function datetimeLocalToIso(local: string): string | undefined {
-  const t = local.trim()
-  if (!t) return undefined
-  const d = new Date(t)
-  if (Number.isNaN(d.getTime())) return undefined
-  return d.toISOString()
 }
 
 function Toggle({
@@ -386,7 +372,7 @@ export function PromotionEditorPage() {
   }
 
   return (
-    <div className="p-6 pb-28 text-slate-900 dark:text-slate-50 lg:p-10">
+    <div className="min-w-0 px-4 pt-6 pb-28 text-slate-900 dark:text-slate-50 sm:px-6 lg:p-10">
       <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">
@@ -472,7 +458,7 @@ export function PromotionEditorPage() {
                     setTargetIdStr(undefined)
                     setTargetLabel('')
                   }}
-                  className="mt-1.5 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-[#0f1419] dark:text-slate-50"
+                  className="select-tail mt-1.5 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-[#0f1419] dark:text-slate-50"
                 >
                   <option value="collection">Collection</option>
                   <option value="product">Product</option>
@@ -517,21 +503,15 @@ export function PromotionEditorPage() {
             <div className="mt-4 space-y-3">
               <div>
                 <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Start date &amp; time</label>
-                <input
-                  type="datetime-local"
-                  value={startLocal}
-                  onChange={(e) => setStartLocal(e.target.value)}
-                  className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-[#0f1419] dark:text-slate-50"
-                />
+                <div className="mt-1">
+                  <AdminDateTimeField value={startLocal} onChange={setStartLocal} />
+                </div>
               </div>
               <div>
                 <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Expiration date &amp; time</label>
-                <input
-                  type="datetime-local"
-                  value={endLocal}
-                  onChange={(e) => setEndLocal(e.target.value)}
-                  className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-[#0f1419] dark:text-slate-50"
-                />
+                <div className="mt-1">
+                  <AdminDateTimeField value={endLocal} onChange={setEndLocal} />
+                </div>
               </div>
               <p className="flex items-start gap-2 text-xs text-slate-500 dark:text-slate-400">
                 <span className="text-blue-500" aria-hidden>

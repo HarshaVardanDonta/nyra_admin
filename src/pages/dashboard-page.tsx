@@ -81,7 +81,7 @@ function SalesAreaChart({ data }: { data: GraphPoint[] }) {
   return (
     <svg
       viewBox={`0 0 ${w} ${h}`}
-      className="h-[240px] w-full"
+      className="h-[240px] w-full max-w-full"
       preserveAspectRatio="xMidYMid meet"
       role="img"
       aria-label="Sales over time"
@@ -193,7 +193,7 @@ export function DashboardPage() {
   }, [load])
 
   return (
-    <div className="min-h-full px-6 py-8 lg:px-10">
+    <div className="min-h-full min-w-0 px-4 py-6 sm:px-6 sm:py-8 lg:px-10">
       <header className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-50">
@@ -241,15 +241,15 @@ export function DashboardPage() {
 
       {overview ? (
         <>
-          <section className="mt-10 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <section className="mt-10 grid min-w-0 gap-4 sm:grid-cols-2 xl:grid-cols-4">
             <KpiStatCard title="Total Sales" kpi={overview.kpis.totalSales} format="currency" />
             <KpiStatCard title="Orders Today" kpi={overview.kpis.ordersToday} format="integer" />
             <KpiStatCard title="Total Customers" kpi={overview.kpis.totalCustomers} format="integer" />
             <KpiStatCard title="Revenue This Month" kpi={overview.kpis.revenueThisMonth} format="currency" />
           </section>
 
-          <section className="mt-8 grid gap-6 lg:grid-cols-3">
-            <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 lg:col-span-2">
+          <section className="mt-8 grid min-w-0 gap-6 lg:grid-cols-3">
+            <div className="min-w-0 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 lg:col-span-2">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <h2 className="text-base font-semibold text-slate-900 dark:text-slate-50">
                   Sales Graph (
@@ -274,12 +274,12 @@ export function DashboardPage() {
                   ))}
                 </div>
               </div>
-              <div className="mt-4">
+              <div className="mt-4 min-w-0">
                 <SalesAreaChart data={overview.salesGraph.data} />
               </div>
             </div>
 
-            <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5">
+            <div className="min-w-0 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5">
               <h2 className="text-base font-semibold text-slate-900 dark:text-slate-50">
                 Top Selling Products
               </h2>
@@ -323,8 +323,8 @@ export function DashboardPage() {
             </div>
           </section>
 
-          <section className="mt-8 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
-            <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 px-5 py-4">
+          <section className="mt-8 min-w-0 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
+            <div className="flex flex-col gap-3 border-b border-slate-200 dark:border-slate-800 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
               <h2 className="text-base font-semibold text-slate-900 dark:text-slate-50">Recent Orders</h2>
               <button
                 type="button"

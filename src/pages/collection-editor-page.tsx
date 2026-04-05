@@ -413,7 +413,7 @@ export function CollectionEditorPage() {
   }
 
   return (
-    <div className="bg-[#0b0e14] p-6 pb-32 text-slate-200 lg:p-10">
+    <div className="bg-[#0b0e14] min-w-0 px-4 pt-6 pb-32 text-slate-200 sm:px-6 lg:p-10">
       <nav className="mb-6 text-sm text-slate-500">
         <Link to="/collections" className="hover:text-blue-400">
           Collections
@@ -444,7 +444,7 @@ export function CollectionEditorPage() {
         </div>
       </div>
 
-      <div className="grid gap-8 lg:grid-cols-[1fr_320px]">
+      <div className="min-w-0 grid gap-8 lg:grid-cols-[1fr_320px]">
         <div className="space-y-6">
           <section className="rounded-xl border border-slate-800 bg-[#151b23] p-6 shadow-xl">
             <div className="mb-4 flex items-center gap-2 text-blue-400">

@@ -21,6 +21,7 @@ import {
   type ProductVariantInput,
 } from '../lib/api/products'
 import { resolveMediaUrl } from '../lib/media-url'
+import { AdminDateField, AdminDateTimeField } from '../components/admin-date-field'
 
 function slugify(s: string) {
   return s
@@ -390,7 +391,7 @@ export function ProductEditorPage() {
   }
 
   return (
-    <div className="p-6 pb-36 text-slate-900 dark:text-slate-50 lg:p-10">
+    <div className="min-w-0 px-4 pt-6 pb-36 text-slate-900 dark:text-slate-50 sm:px-6 lg:p-10">
       <div className="mb-8">
         <Link
           to="/products"
@@ -406,7 +407,7 @@ export function ProductEditorPage() {
         </p>
       </div>
 
-      <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
+      <div className="flex min-w-0 flex-col gap-6 lg:flex-row lg:items-start">
         <div className="min-w-0 flex-1 space-y-6">
           <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-[#0f1419]">
             <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
@@ -451,7 +452,7 @@ export function ProductEditorPage() {
                   <select
                     value={brandId}
                     onChange={(e) => setBrandId(e.target.value)}
-                    className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900"
+                    className="select-tail mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900"
                   >
                     <option value="">Select Brand</option>
                     {brands.map((b) => (
@@ -468,7 +469,7 @@ export function ProductEditorPage() {
                   <select
                     value={categoryId}
                     onChange={(e) => setCategoryId(e.target.value)}
-                    className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900"
+                    className="select-tail mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900"
                   >
                     <option value="">Select Category</option>
                     {categories.map((c) => (
@@ -676,7 +677,7 @@ export function ProductEditorPage() {
           </section>
         </div>
 
-        <div className="w-full shrink-0 space-y-6 lg:w-[320px]">
+        <div className="w-full min-w-0 shrink-0 space-y-6 lg:w-[320px]">
           <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-[#0f1419]">
             <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Pricing</h2>
             <div className="mt-4 space-y-3">
@@ -719,12 +720,13 @@ export function ProductEditorPage() {
                 <label className="text-xs font-medium text-slate-500 dark:text-slate-400">
                   Discount expiration
                 </label>
-                <input
-                  type="date"
-                  value={discountExpiry}
-                  onChange={(e) => setDiscountExpiry(e.target.value)}
-                  className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900"
-                />
+                <div className="mt-1">
+                  <AdminDateField
+                    value={discountExpiry}
+                    onChange={setDiscountExpiry}
+                    className="dark:bg-slate-900"
+                  />
+                </div>
               </div>
             </div>
           </section>
@@ -784,24 +786,21 @@ export function ProductEditorPage() {
                 <select
                   value={visibility}
                   onChange={(e) => setVisibility(e.target.value)}
-                  className="rounded border border-slate-200 bg-white px-2 py-0.5 text-sm font-medium text-blue-600 dark:border-slate-700 dark:bg-slate-900 dark:text-blue-400"
+                  className="select-tail rounded border border-slate-200 bg-white px-2 py-0.5 text-sm font-medium text-blue-600 dark:border-slate-700 dark:bg-slate-900 dark:text-blue-400"
                 >
                   <option value="public">Public</option>
                   <option value="hidden">Hidden</option>
                 </select>
               </div>
-              <div className="flex justify-between">
-                <span className="text-slate-500 dark:text-slate-400">Scheduled for</span>
-                <input
-                  type="datetime-local"
+              <div className="flex justify-between items-center gap-2">
+                <span className="text-slate-500 dark:text-slate-400 shrink-0">Scheduled for</span>
+                <AdminDateTimeField
                   value={scheduledAt}
-                  onChange={(e) => setScheduledAt(e.target.value)}
-                  className="max-w-[10rem] rounded border border-slate-200 bg-white px-1 py-0.5 text-xs dark:border-slate-700 dark:bg-slate-900"
+                  onChange={setScheduledAt}
+                  placeholder="Now"
+                  className="max-w-[12rem] shrink-0 rounded border border-slate-200 px-1 py-0.5 text-xs dark:border-slate-700 dark:bg-slate-900"
                 />
               </div>
-              {!scheduledAt ? (
-                <p className="text-right text-xs text-slate-500 dark:text-slate-400">Now</p>
-              ) : null}
             </div>
           </section>
         </div>

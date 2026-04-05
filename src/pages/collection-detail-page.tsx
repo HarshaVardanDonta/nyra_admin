@@ -159,7 +159,7 @@ export function CollectionDetailPage() {
   const seg = collectionSlugSegment(collection.slug)
 
   return (
-    <div className="bg-[#0b0e14] p-6 pb-28 text-slate-200 lg:p-10">
+    <div className="bg-[#0b0e14] min-w-0 px-4 pt-6 pb-28 text-slate-200 sm:px-6 lg:p-10">
       <nav className="mb-6 text-sm text-slate-500">
         <Link to="/collections" className="hover:text-blue-400">
           Collections
@@ -219,8 +219,8 @@ export function CollectionDetailPage() {
         </div>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
-        <section className="space-y-6">
+      <div className="grid min-w-0 gap-6 lg:grid-cols-[1fr_340px]">
+        <section className="min-w-0 space-y-6">
           <div className="overflow-hidden rounded-xl border border-slate-800 bg-[#151b23] shadow-xl">
             <div
               className={`relative flex min-h-[200px] flex-col justify-end bg-gradient-to-br from-slate-800 to-slate-900 p-8 ${
@@ -273,7 +273,7 @@ export function CollectionDetailPage() {
                 <p className="text-sm text-slate-500">{collection.products.length} total items</p>
               </div>
               <div className="flex flex-wrap gap-2">
-                <label className="relative flex-1 min-w-[200px]">
+                <label className="relative min-w-0 w-full flex-1 sm:min-w-[200px]">
                   <span className="sr-only">Search</span>
                   <svg
                     className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500"
@@ -411,7 +411,7 @@ export function CollectionDetailPage() {
           </div>
         </section>
 
-        <aside className="space-y-6">
+        <aside className="min-w-0 space-y-6">
           <div className="rounded-xl border border-slate-800 bg-[#151b23] p-5 shadow-xl">
             <div className="flex items-center gap-2 text-white">
               <svg className="h-5 w-5 text-blue-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">

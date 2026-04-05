@@ -183,7 +183,7 @@ export function AnalyticsPage() {
   const kpis = data?.kpis
 
   return (
-    <div className="min-h-full min-w-0 max-w-full px-6 py-8 lg:px-10">
+    <div className="min-h-full min-w-0 max-w-full px-4 py-6 sm:px-6 sm:py-8 lg:px-10">
       <header className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-50">
@@ -360,8 +360,8 @@ export function AnalyticsPage() {
             </ChartCard>
           </section>
 
-          <section className="mt-8 grid gap-6 lg:grid-cols-3">
-            <div className="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-900">
+          <section className="mt-8 grid min-w-0 gap-6 lg:grid-cols-3">
+            <div className="min-w-0 rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-900">
               <div className="flex items-center justify-between">
                 <h2 className="text-base font-semibold text-slate-900 dark:text-slate-50">
                   Top Products
@@ -402,7 +402,7 @@ export function AnalyticsPage() {
               </ul>
             </div>
 
-            <div className="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-900">
+            <div className="min-w-0 rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-900">
               <h2 className="text-base font-semibold text-slate-900 dark:text-slate-50">
                 Top Categories
               </h2>
@@ -430,7 +430,7 @@ export function AnalyticsPage() {
               </ul>
             </div>
 
-            <div className="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-900">
+            <div className="min-w-0 rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-900">
               <div className="flex items-center justify-between">
                 <h2 className="text-base font-semibold text-slate-900 dark:text-slate-50">
                   Top Customers

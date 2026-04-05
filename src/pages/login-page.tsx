@@ -125,7 +125,7 @@ export function LoginPage() {
       </div>
 
       <div className="relative flex min-h-full items-center justify-center px-4 py-12">
-        <div className="relative w-full max-w-[400px] rounded-xl border border-slate-200 bg-white p-8 shadow-xl shadow-slate-900/10 dark:border-slate-800 dark:bg-slate-900 dark:shadow-black/20">
+        <div className="relative w-full max-w-[400px] rounded-xl border border-slate-200 bg-white p-6 shadow-xl shadow-slate-900/10 dark:border-slate-800 dark:bg-slate-900 dark:shadow-black/20 sm:p-8">
           <div className="mb-8">
           <BrandMark />
           <p className="mt-4 text-center text-sm text-slate-500 dark:text-slate-400">

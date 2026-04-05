@@ -120,7 +120,7 @@ export function CategoryDetailPage() {
   const banner = category.bannerUrl ? resolveMediaUrl(category.bannerUrl) : ''
 
   return (
-    <div className="p-6 pb-28 text-slate-900 dark:text-slate-50 lg:p-10">
+    <div className="min-w-0 px-4 pt-6 pb-28 text-slate-900 dark:text-slate-50 sm:px-6 lg:p-10">
       <nav className="mb-6 text-sm text-slate-500 dark:text-slate-400">
         <Link to="/dashboard" className="hover:text-blue-600 dark:hover:text-blue-400">
           Dashboard
@@ -174,7 +174,7 @@ export function CategoryDetailPage() {
         </div>
       </div>
 
-      <div className="mb-6 grid gap-6 lg:grid-cols-[1fr_320px]">
+      <div className="mb-6 min-w-0 grid gap-6 lg:grid-cols-[1fr_320px]">
         <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-[#0f1419]">
           {banner ? (
             <div className="h-36 w-full bg-slate-900">
@@ -238,7 +238,7 @@ export function CategoryDetailPage() {
         </section>
       </div>
 
-      <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_320px]">
+      <div className="mb-6 min-w-0 grid gap-4 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_320px]">
         <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-[#0f1419]">
           <div className="flex items-start justify-between">
             <p className="text-xs font-medium text-slate-500 dark:text-slate-400">Total products</p>

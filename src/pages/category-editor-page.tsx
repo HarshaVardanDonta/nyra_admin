@@ -326,7 +326,7 @@ export function CategoryEditorPage() {
   }
 
   return (
-    <div className="p-6 pb-28 text-slate-900 dark:text-slate-50 lg:p-10">
+    <div className="min-w-0 px-4 pt-6 pb-28 text-slate-900 dark:text-slate-50 sm:px-6 lg:p-10">
       <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">
@@ -354,7 +354,7 @@ export function CategoryEditorPage() {
         </div>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
+      <div className="min-w-0 grid gap-6 lg:grid-cols-[1fr_320px]">
         <div className="flex flex-col gap-6">
           <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-[#0f1419]">
             <h2 className="flex items-center gap-2 text-sm font-semibold text-slate-900 dark:text-slate-100">
@@ -446,7 +446,7 @@ export function CategoryEditorPage() {
                   id={`${baseId}-parent`}
                   value={parentCategoryId}
                   onChange={(e) => setParentCategoryId(e.target.value)}
-                  className="mt-1.5 w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm dark:border-slate-700 dark:bg-slate-900"
+                  className="select-tail mt-1.5 w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm dark:border-slate-700 dark:bg-slate-900"
                 >
                   <option value="">None (Top Level)</option>
                   {parentChoices.map((c) => (

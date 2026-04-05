@@ -103,7 +103,7 @@ export function CollectionsPage() {
   }
 
   return (
-    <div className="bg-[#0b0e14] p-6 pb-28 text-slate-50 lg:p-10">
+    <div className="bg-[#0b0e14] min-w-0 px-4 pt-6 pb-28 text-slate-50 sm:px-6 lg:p-10">
       <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-white">Collections</h1>
@@ -133,7 +133,7 @@ export function CollectionsPage() {
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value as CollectionStatusFilter)}
-              className="cursor-pointer border-none bg-transparent text-sm font-medium text-slate-200 outline-none"
+              className="select-tail cursor-pointer border-none bg-transparent text-sm font-medium text-slate-200 outline-none"
             >
               <option value="all">All Status</option>
               <option value="published">Published</option>
@@ -146,7 +146,7 @@ export function CollectionsPage() {
             </svg>
             <select
               disabled
-              className="cursor-not-allowed border-none bg-transparent text-sm font-medium text-slate-500 outline-none"
+              className="select-tail cursor-not-allowed border-none bg-transparent text-sm font-medium text-slate-500 outline-none"
               title="Date range filter is not available yet"
             >
               <option>All Time</option>
@@ -157,7 +157,7 @@ export function CollectionsPage() {
             <select
               value={sort}
               onChange={(e) => setSort(e.target.value as CollectionSort)}
-              className="cursor-pointer border-none bg-transparent text-sm font-medium text-slate-200 outline-none"
+              className="select-tail cursor-pointer border-none bg-transparent text-sm font-medium text-slate-200 outline-none"
             >
               <option value="name_asc">Name A–Z</option>
               <option value="name_desc">Name Z–A</option>

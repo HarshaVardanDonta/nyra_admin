@@ -251,7 +251,7 @@ export function OrderDetailPage() {
 
   if (!Number.isFinite(orderId) || orderId <= 0) {
     return (
-      <div className="p-6 lg:p-10">
+      <div className="min-w-0 px-4 py-6 sm:px-6 lg:p-10">
         <p className="text-slate-600 dark:text-slate-400">Invalid order.</p>
         <Link to="/orders" className="mt-2 inline-block text-blue-600 dark:text-blue-400">
           Back to orders
@@ -262,7 +262,7 @@ export function OrderDetailPage() {
 
   if (loading && !detail) {
     return (
-      <div className="p-6 lg:p-10">
+      <div className="min-w-0 px-4 py-6 sm:px-6 lg:p-10">
         <p className="text-slate-500 dark:text-slate-400">Loading…</p>
       </div>
     )
@@ -270,7 +270,7 @@ export function OrderDetailPage() {
 
   if (!detail) {
     return (
-      <div className="p-6 lg:p-10">
+      <div className="min-w-0 px-4 py-6 sm:px-6 lg:p-10">
         <p className="text-slate-600 dark:text-slate-400">Order not found.</p>
         <Link to="/orders" className="mt-2 inline-block text-blue-600 dark:text-blue-400">
           Back to orders
@@ -283,7 +283,7 @@ export function OrderDetailPage() {
     detail
 
   return (
-    <div className="p-6 pb-28 text-slate-900 dark:text-slate-50 lg:p-10">
+    <div className="min-w-0 px-4 pt-6 pb-28 text-slate-900 dark:text-slate-50 sm:px-6 lg:p-10">
       <nav className="mb-4 text-sm text-slate-500 dark:text-slate-400">
         <Link to="/dashboard" className="hover:text-slate-800 dark:hover:text-slate-200">
           Dashboard
@@ -352,7 +352,7 @@ export function OrderDetailPage() {
           <select
             value={selectedStatusId}
             onChange={(e) => setSelectedStatusId(e.target.value)}
-            className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-900"
+            className="select-tail mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-900"
           >
             {detail.available_statuses.map((s) => (
               <option key={s.id} value={String(s.id)}>
@@ -616,7 +616,7 @@ export function OrderDetailPage() {
           <select
             value={shippingAddressId}
             onChange={(e) => setShippingAddressId(e.target.value)}
-            className="mt-1 w-full max-w-2xl rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-900"
+            className="select-tail mt-1 w-full max-w-2xl rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-900"
           >
             <option value="">None</option>
             {addresses.map((a) => (

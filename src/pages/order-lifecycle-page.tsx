@@ -489,7 +489,7 @@ function DeleteStatusModal(props: {
           <label className="mt-4 block text-sm">
             <span className="font-medium text-slate-700 dark:text-slate-300">Move orders to</span>
             <select
-              className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-900"
+              className="select-tail mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-900"
               value={reassignTargetId}
               onChange={(e) => onReassignTargetId(e.target.value)}
             >
@@ -701,7 +701,7 @@ export function OrderLifecyclePage() {
   const total = items.length
 
   return (
-    <div className="p-6 pb-28 text-slate-900 dark:text-slate-50 lg:p-10">
+    <div className="min-w-0 px-4 pt-6 pb-28 text-slate-900 dark:text-slate-50 sm:px-6 lg:p-10">
       <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Status Lifecycle</h1>

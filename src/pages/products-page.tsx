@@ -310,7 +310,7 @@ export function ProductsPage() {
   }
 
   return (
-    <div className="p-6 pb-28 text-slate-900 dark:text-slate-50 lg:p-10">
+    <div className="min-w-0 px-4 pt-6 pb-28 text-slate-900 dark:text-slate-50 sm:px-6 lg:p-10">
       <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Products</h1>
@@ -361,11 +361,11 @@ export function ProductsPage() {
               className="w-full rounded-lg border border-slate-200 bg-slate-50 py-2.5 pl-10 pr-3 text-sm outline-none ring-blue-500/30 focus:border-blue-500 focus:ring-2 dark:border-slate-700 dark:bg-slate-900/80 dark:focus:border-blue-500"
             />
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-2 [&_select]:min-w-[10rem] [&_select]:max-w-full [&_select]:shrink-0">
             <select
               value={categoryId}
               onChange={(e) => setCategoryId(e.target.value)}
-              className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900"
+              className="select-tail rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900"
             >
               <option value="">Category</option>
               {categories.map((c) => (
@@ -377,7 +377,7 @@ export function ProductsPage() {
             <select
               value={brandId}
               onChange={(e) => setBrandId(e.target.value)}
-              className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900"
+              className="select-tail rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900"
             >
               <option value="">Brand</option>
               {brands.map((b) => (
@@ -389,7 +389,7 @@ export function ProductsPage() {
             <select
               value={stockFilter}
               onChange={(e) => setStockFilter(e.target.value as StockFilter)}
-              className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900"
+              className="select-tail rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900"
             >
               <option value="all">Stock Status</option>
               <option value="in_stock">In stock</option>
@@ -399,7 +399,7 @@ export function ProductsPage() {
             <select
               value={discountFilter}
               onChange={(e) => setDiscountFilter(e.target.value as DiscountFilter)}
-              className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900"
+              className="select-tail rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900"
             >
               <option value="all">Discount Active</option>
               <option value="active">Yes</option>
@@ -408,7 +408,7 @@ export function ProductsPage() {
             <select
               value={publicationFilter}
               onChange={(e) => setPublicationFilter(e.target.value as PublicationListFilter)}
-              className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900"
+              className="select-tail rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900"
               title={token ? undefined : 'Admin API required for draft / unpublished rows'}
             >
               <option value="all">Publication: All</option>

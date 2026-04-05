@@ -152,7 +152,7 @@ export function BrandDetailPage() {
   const banner = brand.bannerUrl ? resolveMediaUrl(brand.bannerUrl) : ''
 
   return (
-    <div className="p-6 pb-28 text-slate-900 dark:text-slate-50 lg:p-10">
+    <div className="min-w-0 px-4 pt-6 pb-28 text-slate-900 dark:text-slate-50 sm:px-6 lg:p-10">
       <nav className="mb-6 text-sm text-slate-500 dark:text-slate-400">
         <Link to="/brands" className="hover:text-blue-600 dark:hover:text-blue-400">
           Brands
@@ -274,7 +274,7 @@ export function BrandDetailPage() {
         </div>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,380px)_1fr]">
+      <div className="min-w-0 grid gap-6 lg:grid-cols-[minmax(0,380px)_1fr]">
         <div className="flex flex-col gap-6">
           <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-[#0f1419]">
             <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Brand information</h2>

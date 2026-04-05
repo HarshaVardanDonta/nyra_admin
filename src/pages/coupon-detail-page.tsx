@@ -157,7 +157,7 @@ export function CouponDetailPage() {
       : `${coupon.discountValue}%`
 
   return (
-    <div className="p-6 pb-28 text-slate-900 dark:text-slate-50 lg:p-10">
+    <div className="min-w-0 px-4 pt-6 pb-28 text-slate-900 dark:text-slate-50 sm:px-6 lg:p-10">
       <nav className="mb-4 text-[11px] font-semibold uppercase tracking-widest text-blue-600 dark:text-blue-400">
         <Link to="/coupons" className="transition hover:underline">
           Coupons
