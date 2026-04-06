@@ -1,0 +1,82 @@
+name: Deploy admin to VPS (reusable)
+
+on:
+  workflow_call:
+    inputs:
+      compose_services:
+        description: "Space-separated Compose service names (e.g. admin admin_dev); empty = all services in the file"
+        type: string
+        required: false
+        default: ""
+
+concurrency:
+  group: vps-admin-${{ inputs.compose_services || 'full' }}
+  cancel-in-progress: true
+
+jobs:
+  verify-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install and build (smoke check)
+        env:
+          VITE_API_BASE_URL: https://api.nccppl.com
+        run: |
+          npm ci
+          npm run build
+
+      - name: Validate required secrets
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_PORT: ${{ secrets.VPS_PORT }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_SSH_PASSPHRASE: ${{ secrets.VPS_SSH_PASSPHRASE }}
+        run: |
+          set -eu
+          [ -n "$VPS_HOST" ] || (echo "Missing secret: VPS_HOST" && exit 1)
+          [ -n "$VPS_PORT" ] || (echo "Missing secret: VPS_PORT" && exit 1)
+          [ -n "$VPS_USER" ] || (echo "Missing secret: VPS_USER" && exit 1)
+          [ -n "$VPS_SSH_KEY" ] || (echo "Missing secret: VPS_SSH_KEY" && exit 1)
+          [ -n "$VPS_SSH_PASSPHRASE" ] || (echo "Missing secret: VPS_SSH_PASSPHRASE" && exit 1)
+
+      - name: Upload code to VPS
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          passphrase: ${{ secrets.VPS_SSH_PASSPHRASE }}
+          port: ${{ secrets.VPS_PORT }}
+          source: "."
+          target: "/opt/nyra_admin"
+          overwrite: true
+          strip_components: 0
+          rm: false
+
+      - name: Run remote deploy script
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          passphrase: ${{ secrets.VPS_SSH_PASSPHRASE }}
+          port: ${{ secrets.VPS_PORT }}
+          script: |
+            set -eu
+            cd /opt/nyra_admin
+            chmod +x scripts/deploy.sh
+            SERVICES="${{ inputs.compose_services }}"
+            if [ -n "$SERVICES" ]; then
+              ./scripts/deploy.sh /opt/nyra_admin docker-compose.yml $SERVICES
+            else
+              ./scripts/deploy.sh /opt/nyra_admin docker-compose.yml
+            fi

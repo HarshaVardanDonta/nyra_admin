@@ -16,8 +16,8 @@ export default defineConfig(({ mode }) => {
   const pathPrefix = normalizePathPrefix(env.VITE_API_PATH_PREFIX)
 
   /**
-   * When `VITE_API_PATH_PREFIX` is set (e.g. `/dev`), proxy that subtree to the backend.
-   * Otherwise proxy `/api` and `/healthz` (production-style paths).
+   * When `VITE_API_PATH_PREFIX` is set, proxy that subtree to the backend.
+   * Otherwise proxy `/api` and `/healthz`.
    */
   const apiProxy: Record<string, { target: string; changeOrigin: boolean }> =
     pathPrefix

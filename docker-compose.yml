@@ -1,13 +1,24 @@
 services:
-  web:
+  admin:
     build:
       context: .
       dockerfile: Dockerfile
       args:
-        # Loaded from project .env (same directory as this file). Not available inside the image at runtime.
-        VITE_API_BASE_URL: ${VITE_API_BASE_URL:?Set VITE_API_BASE_URL in .env - see .env.example}
-        VITE_API_PATH_PREFIX: ${VITE_API_PATH_PREFIX:-}
+        VITE_API_BASE_URL: https://api.nccppl.com
+        VITE_API_PATH_PREFIX: ""
     container_name: nyra_admin
     ports:
       - "8081:80"
+    restart: unless-stopped
+
+  admin_dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE_URL: https://api-dev.nccppl.com
+        VITE_API_PATH_PREFIX: ""
+    container_name: nyra_admin_dev
+    ports:
+      - "8084:80"
     restart: unless-stopped

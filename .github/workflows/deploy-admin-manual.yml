@@ -1,0 +1,20 @@
+name: Deploy admin (manual)
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: "Which container(s) to rebuild and start"
+        type: choice
+        required: true
+        options:
+          - both
+          - admin
+          - admin_dev
+
+jobs:
+  deploy:
+    uses: ./.github/workflows/deploy-vps-reusable.yml
+    with:
+      compose_services: ${{ inputs.target == 'both' && 'admin admin_dev' || inputs.target }}
+    secrets: inherit

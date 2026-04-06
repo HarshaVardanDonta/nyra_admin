@@ -1,0 +1,14 @@
+name: Deploy admin stack (prod + dev containers)
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    uses: ./.github/workflows/deploy-vps-reusable.yml
+    with:
+      compose_services: admin admin_dev
+    secrets: inherit

@@ -2,7 +2,7 @@ function normalizeBaseUrl(raw: string): string {
   return raw.replace(/\/+$/, '')
 }
 
-/** Normalizes VITE_API_PATH_PREFIX (e.g. `/dev`); empty if unset. */
+/** Normalizes VITE_API_PATH_PREFIX (e.g. `/api/v2`); empty if unset. */
 function normalizePathPrefix(raw: string | undefined): string {
   const t = (raw ?? '').trim()
   if (!t) return ''
@@ -12,10 +12,10 @@ function normalizePathPrefix(raw: string | undefined): string {
 
 /**
  * Base URL for API requests (origin + optional path prefix).
- * - Set `VITE_API_PATH_PREFIX=/dev` when the backend runs with `ENVIRONMENT=dev` (routes under `/dev`).
- * - Development (direct): `VITE_API_BASE_URL=http://localhost:8080` and optional prefix → e.g. `http://localhost:8080/dev`.
- * - Development (proxy): leave `VITE_API_BASE_URL` empty; Vite proxies the prefix path (or `/api` + `/healthz` when prefix is empty) to `VITE_API_PROXY_TARGET`.
- * - Production: `VITE_API_BASE_URL` is required (no trailing slash); prefix is usually empty.
+ * - Dev vs prod typically differ by host only (`VITE_API_BASE_URL`); leave prefix empty unless the API is mounted under a subpath.
+ * - Development (direct): set `VITE_API_BASE_URL` to the API origin.
+ * - Development (proxy): leave `VITE_API_BASE_URL` empty; Vite proxies `/api` + `/healthz` (or a custom prefix if set) to `VITE_API_PROXY_TARGET`.
+ * - Production: `VITE_API_BASE_URL` is required (no trailing slash).
  */
 export function getApiBaseUrl(): string {
   const raw = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim()
