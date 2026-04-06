@@ -8,8 +8,10 @@ COPY . .
 
 # Baked into the static bundle by Vite; must be set at image build time (see docker-compose build.args).
 ARG VITE_API_BASE_URL
+ARG VITE_API_PATH_PREFIX=
 RUN test -n "$VITE_API_BASE_URL" || (echo "ERROR: VITE_API_BASE_URL build-arg is required. Set it in .env and use docker compose build." >&2 && exit 1)
 ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
+ENV VITE_API_PATH_PREFIX=$VITE_API_PATH_PREFIX
 
 RUN npm run build
 

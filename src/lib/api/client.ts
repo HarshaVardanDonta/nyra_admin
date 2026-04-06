@@ -1,4 +1,4 @@
-import { getApiBaseUrl } from '../../config/env'
+import { buildApiUrl } from '../../config/env'
 import {
   ApiError,
   isInvalidAccessTokenResponse,
@@ -14,11 +14,6 @@ export type RequestOptions = Omit<RequestInit, 'body' | 'headers'> & {
   skipAuthRefresh?: boolean
 }
 
-function joinUrl(base: string, path: string): string {
-  const p = path.startsWith('/') ? path : `/${path}`
-  return `${base}${p}`
-}
-
 async function requestInner<T>(
   path: string,
   options: RequestOptions,
@@ -31,8 +26,7 @@ async function requestInner<T>(
     skipAuthRefresh,
     ...rest
   } = options
-  const base = getApiBaseUrl()
-  const url = joinUrl(base, path)
+  const url = buildApiUrl(path)
 
   const headers = new Headers(initHeaders)
   if (!headers.has('Accept')) {
@@ -130,8 +124,7 @@ export async function fetchWithAuthRetry(
 ): Promise<Response> {
   const { method = 'GET', headers: initHeaders, token, skipAuthRefresh } =
     init
-  const base = getApiBaseUrl()
-  const url = joinUrl(base, path)
+  const url = buildApiUrl(path)
   const headers = new Headers(initHeaders)
   if (token) {
     headers.set('Authorization', `Bearer ${token}`)

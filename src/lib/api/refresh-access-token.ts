@@ -1,10 +1,8 @@
-import { getApiBaseUrl } from '../../config/env'
+import { buildApiUrl } from '../../config/env'
 import { ApiError, toApiError } from './errors'
 
 export async function refreshAccessToken(refreshToken: string): Promise<string> {
-  const base = getApiBaseUrl()
-  const path = '/api/v1/auth/refresh'
-  const url = `${base}${path.startsWith('/') ? path : `/${path}`}`
+  const url = buildApiUrl('/api/v1/auth/refresh')
 
   let res: Response
   try {
