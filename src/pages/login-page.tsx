@@ -1,9 +1,23 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/use-auth'
 import { useTheme } from '../contexts/use-theme'
-import { sendOtp, verifyAdminOtp } from '../lib/api/auth'
-import { ApiError } from '../lib/api/errors'
+import {
+  exchangeMsg91WidgetSession,
+  sendOtp,
+  verifyAdminOtp,
+} from '../lib/api/auth'
+import { ApiError, getErrorMessage } from '../lib/api/errors'
+import {
+  getMsg91WidgetCredentials,
+  initMsg91Widget,
+  msg91RetryOtp,
+  msg91SendOtp,
+  msg91VerifyOtp,
+  toMsg91MobileIdentifier,
+  useMsg91WidgetLogin,
+  useMsg91WidgetServerProxy,
+} from '../lib/msg91-widget'
 
 function BrandMark() {
   return (
@@ -37,11 +51,46 @@ export function LoginPage() {
   const { isAuthenticated, login } = useAuth()
   const { theme, toggleTheme } = useTheme()
   const navigate = useNavigate()
+  const widgetMode = useMsg91WidgetLogin()
+  const [widgetReady, setWidgetReady] = useState(!widgetMode)
   const [phone, setPhone] = useState('')
   const [otp, setOtp] = useState('')
   const [requestId, setRequestId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const [resendLoading, setResendLoading] = useState(false)
+
+  useEffect(() => {
+    if (!widgetMode) {
+      setWidgetReady(true)
+      return
+    }
+    if (useMsg91WidgetServerProxy()) {
+      setWidgetReady(true)
+      return
+    }
+    const creds = getMsg91WidgetCredentials()
+    if (!creds) {
+      return
+    }
+    let cancelled = false
+    setWidgetReady(false)
+    void initMsg91Widget(creds.widgetId, creds.authToken)
+      .then(() => {
+        if (!cancelled) {
+          setWidgetReady(true)
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setError('Could not initialize MSG91 OTP widget')
+          setWidgetReady(false)
+        }
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [widgetMode])
 
   if (isAuthenticated) {
     return <Navigate to="/dashboard" replace />
@@ -57,13 +106,28 @@ export function LoginPage() {
       setError('Enter your phone number')
       return
     }
+    if (widgetMode && !widgetReady) {
+      setError('OTP widget is still loading')
+      return
+    }
     setLoading(true)
     try {
-      const { request_id } = await sendOtp(trimmed)
-      setRequestId(request_id)
-      setOtp('')
+      if (widgetMode) {
+        const identifier = toMsg91MobileIdentifier(trimmed)
+        if (!identifier) {
+          setError('Enter a valid Indian mobile number (10 digits or +91…)')
+          return
+        }
+        const req = await msg91SendOtp(identifier)
+        setRequestId(req)
+        setOtp('')
+      } else {
+        const { request_id } = await sendOtp(trimmed)
+        setRequestId(request_id)
+        setOtp('')
+      }
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Could not send OTP')
+      setError(err instanceof ApiError ? err.message : getErrorMessage(err))
     } finally {
       setLoading(false)
     }
@@ -80,17 +144,40 @@ export function LoginPage() {
     }
     setLoading(true)
     try {
-      const { token, refresh_token } = await verifyAdminOtp({
-        phone: trimmedPhone,
-        otp: trimmedOtp,
-        request_id: requestId,
-      })
-      login(token, refresh_token)
-      navigate('/dashboard', { replace: true })
+      if (widgetMode) {
+        const accessToken = await msg91VerifyOtp(requestId, trimmedOtp)
+        const { token, refresh_token } =
+          await exchangeMsg91WidgetSession(accessToken)
+        login(token, refresh_token)
+        navigate('/dashboard', { replace: true })
+      } else {
+        const { token, refresh_token } = await verifyAdminOtp({
+          phone: trimmedPhone,
+          otp: trimmedOtp,
+          request_id: requestId,
+        })
+        login(token, refresh_token)
+        navigate('/dashboard', { replace: true })
+      }
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Sign in failed')
+      setError(err instanceof ApiError ? err.message : getErrorMessage(err))
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function handleResendWidgetOtp() {
+    if (!requestId || !widgetMode || resendLoading) {
+      return
+    }
+    setError(null)
+    setResendLoading(true)
+    try {
+      await msg91RetryOtp(requestId)
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : getErrorMessage(err))
+    } finally {
+      setResendLoading(false)
     }
   }
 
@@ -127,90 +214,111 @@ export function LoginPage() {
       <div className="relative flex min-h-full items-center justify-center px-4 py-12">
         <div className="relative w-full max-w-[400px] rounded-xl border border-slate-200 bg-white p-6 shadow-xl shadow-slate-900/10 dark:border-slate-800 dark:bg-slate-900 dark:shadow-black/20 sm:p-8">
           <div className="mb-8">
-          <BrandMark />
-          <p className="mt-4 text-center text-sm text-slate-500 dark:text-slate-400">
-            {showOtpStep
-              ? 'Enter the OTP sent to your phone'
-              : 'Sign in with your admin phone number'}
-          </p>
+            <BrandMark />
+            <p className="mt-4 text-center text-sm text-slate-500 dark:text-slate-400">
+              {showOtpStep
+                ? 'Enter the OTP sent to your phone'
+                : 'Sign in with your admin phone number'}
+            </p>
+            {widgetMode ? (
+              <p className="mt-2 text-center text-xs text-slate-400 dark:text-slate-500">
+                Secured with MSG91 OTP
+                {useMsg91WidgetServerProxy() ? ' · via Nyra API' : ''}
+                {!widgetReady ? ' · Initializing…' : ''}
+              </p>
+            ) : null}
           </div>
 
           {error ? (
-          <div
-            className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-500/35 dark:bg-red-500/10 dark:text-red-200"
-            role="alert"
-          >
-            {error}
-          </div>
+            <div
+              className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-500/35 dark:bg-red-500/10 dark:text-red-200"
+              role="alert"
+            >
+              {error}
+            </div>
           ) : null}
 
           {!showOtpStep ? (
-          <form onSubmit={handleSendOtp} className="flex flex-col gap-4">
-            <div className="text-left">
-              <label
-                htmlFor="phone"
-                className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400"
+            <form onSubmit={handleSendOtp} className="flex flex-col gap-4">
+              <div className="text-left">
+                <label
+                  htmlFor="phone"
+                  className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400"
+                >
+                  Phone
+                </label>
+                <input
+                  id="phone"
+                  name="phone"
+                  type="tel"
+                  autoComplete="tel"
+                  value={phone}
+                  onChange={(ev) => setPhone(ev.target.value)}
+                  placeholder="+919876543210"
+                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-500 focus:border-blue-600 focus:ring-4 focus:ring-blue-500/20 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-50 dark:placeholder:text-slate-400 dark:focus:border-blue-500"
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={loading || (widgetMode && !widgetReady)}
+                className="w-full rounded-lg bg-blue-600 py-2.5 text-sm font-medium text-white transition hover:bg-blue-700 disabled:opacity-60"
               >
-                Phone
-              </label>
-              <input
-                id="phone"
-                name="phone"
-                type="tel"
-                autoComplete="tel"
-                value={phone}
-                onChange={(ev) => setPhone(ev.target.value)}
-                placeholder="+919876543210"
-                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-500 focus:border-blue-600 focus:ring-4 focus:ring-blue-500/20 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-50 dark:placeholder:text-slate-400 dark:focus:border-blue-500"
-              />
-            </div>
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full rounded-lg bg-blue-600 py-2.5 text-sm font-medium text-white transition hover:bg-blue-700 disabled:opacity-60"
-            >
-              {loading ? 'Sending…' : 'Send OTP'}
-            </button>
-          </form>
+                {loading ? 'Sending…' : 'Send OTP'}
+              </button>
+            </form>
           ) : (
             <form onSubmit={handleVerify} className="flex flex-col gap-4">
-            <p className="text-left text-xs text-slate-500 dark:text-slate-400">
-              Code sent to{' '}
-              <span className="text-slate-900 dark:text-slate-50">{phone.trim()}</span>
+              <p className="text-left text-xs text-slate-500 dark:text-slate-400">
+                Code sent to{' '}
+                <span className="text-slate-900 dark:text-slate-50">
+                  {phone.trim()}
+                </span>
+                <button
+                  type="button"
+                  onClick={handleChangeNumber}
+                  className="ml-2 text-blue-600 hover:underline dark:text-blue-400"
+                >
+                  Change
+                </button>
+              </p>
+              {widgetMode ? (
+                <div className="text-left">
+                  <button
+                    type="button"
+                    onClick={handleResendWidgetOtp}
+                    disabled={resendLoading}
+                    className="text-xs font-medium text-blue-600 hover:underline disabled:opacity-50 dark:text-blue-400"
+                  >
+                    {resendLoading ? 'Resending…' : 'Resend code (SMS)'}
+                  </button>
+                </div>
+              ) : null}
+              <div className="text-left">
+                <label
+                  htmlFor="otp"
+                  className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400"
+                >
+                  One-time code
+                </label>
+                <input
+                  id="otp"
+                  name="otp"
+                  type="text"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  value={otp}
+                  onChange={(ev) => setOtp(ev.target.value)}
+                  placeholder="Enter OTP"
+                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-500 focus:border-blue-600 focus:ring-4 focus:ring-blue-500/20 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-50 dark:placeholder:text-slate-400 dark:focus:border-blue-500"
+                />
+              </div>
               <button
-                type="button"
-                onClick={handleChangeNumber}
-                className="ml-2 text-blue-600 hover:underline dark:text-blue-400"
+                type="submit"
+                disabled={loading}
+                className="w-full rounded-lg bg-blue-600 py-2.5 text-sm font-medium text-white transition hover:bg-blue-700 disabled:opacity-60"
               >
-                Change
+                {loading ? 'Signing in…' : 'Log in'}
               </button>
-            </p>
-            <div className="text-left">
-              <label
-                htmlFor="otp"
-                className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400"
-              >
-                One-time code
-              </label>
-              <input
-                id="otp"
-                name="otp"
-                type="text"
-                inputMode="numeric"
-                autoComplete="one-time-code"
-                value={otp}
-                onChange={(ev) => setOtp(ev.target.value)}
-                placeholder="Enter OTP"
-                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-500 focus:border-blue-600 focus:ring-4 focus:ring-blue-500/20 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-50 dark:placeholder:text-slate-400 dark:focus:border-blue-500"
-              />
-            </div>
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full rounded-lg bg-blue-600 py-2.5 text-sm font-medium text-white transition hover:bg-blue-700 disabled:opacity-60"
-            >
-              {loading ? 'Signing in…' : 'Log in'}
-            </button>
             </form>
           )}
           <div className="mt-6 flex justify-center border-t border-slate-200 pt-4 dark:border-slate-700">

@@ -35,3 +35,13 @@ export async function verifyAdminOtp(
     },
   })
 }
+
+/** Exchange MSG91 widget access token (from OTPWidget.verifyOTP) for Nyra JWTs. */
+export async function exchangeMsg91WidgetSession(
+  accessToken: string,
+): Promise<VerifyResponse> {
+  return request<VerifyResponse>('/api/v1/auth/otp/widget-session', {
+    method: 'POST',
+    body: { access_token: accessToken },
+  })
+}
