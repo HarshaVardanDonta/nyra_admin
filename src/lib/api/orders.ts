@@ -1,5 +1,6 @@
 import { fetchWithAuthRetry, request } from './client'
 import { ApiError } from './errors'
+import { pickUserPublicId } from './users'
 
 const API = '/api/v1'
 
@@ -12,8 +13,8 @@ export type OrderListStatus = {
   indicator_color: string
 }
 
-export type OrderListCustomer = {
-  id: number
+export type OrderListUser = {
+  id: string
   name: string
   initials: string
   avatar_color: string
@@ -27,7 +28,7 @@ export type OrderListRow = {
   payment_status: string
   status: OrderListStatus
   date: string
-  customer: OrderListCustomer | null
+  user: OrderListUser | null
 }
 
 export type OrdersListPagination = {
@@ -43,7 +44,8 @@ export type OrdersListParams = {
   per_page?: number
   status_id?: number
   payment_status?: string
-  customer_id?: number
+  /** Numeric string only; backend list filter parses an int. */
+  user_id?: string
   period?: '7d' | '30d' | '1y' | 'all'
   sort_by?: string
   sort_dir?: 'asc' | 'desc'
@@ -75,17 +77,17 @@ function normalizeListRow(raw: unknown): OrderListRow | null {
   if (!st) return null
   const sid = pickNum(st, 'id')
   if (sid === undefined) return null
-  let customer: OrderListCustomer | null = null
-  const cr = o.customer
-  if (cr && typeof cr === 'object' && !Array.isArray(cr)) {
-    const c = cr as Record<string, unknown>
-    const cid = pickNum(c, 'id')
-    if (cid !== undefined) {
-      customer = {
-        id: cid,
-        name: pickStr(c, 'name') ?? '',
-        initials: pickStr(c, 'initials') ?? '',
-        avatar_color: pickStr(c, 'avatar_color') ?? '#3B82F6',
+  let user: OrderListUser | null = null
+  const ur = o.user ?? o.customer
+  if (ur && typeof ur === 'object' && !Array.isArray(ur)) {
+    const u = ur as Record<string, unknown>
+    const uid = pickUserPublicId(u.id)
+    if (uid) {
+      user = {
+        id: uid,
+        name: pickStr(u, 'name') ?? '',
+        initials: pickStr(u, 'initials') ?? '',
+        avatar_color: pickStr(u, 'avatar_color') ?? '#3B82F6',
       }
     }
   }
@@ -101,7 +103,7 @@ function normalizeListRow(raw: unknown): OrderListRow | null {
       indicator_color: pickStr(st, 'indicator_color') ?? '',
     },
     date: pickStr(o, 'date') ?? '',
-    customer,
+    user,
   }
 }
 
@@ -115,7 +117,7 @@ export async function fetchOrders(
   if (params.per_page != null && params.per_page > 0) q.set('per_page', String(params.per_page))
   if (params.status_id != null && params.status_id > 0) q.set('status_id', String(params.status_id))
   if (params.payment_status?.trim()) q.set('payment_status', params.payment_status.trim())
-  if (params.customer_id != null && params.customer_id > 0) q.set('customer_id', String(params.customer_id))
+  if (params.user_id?.trim()) q.set('user_id', params.user_id.trim())
   if (params.period) q.set('period', params.period)
   if (params.sort_by?.trim()) q.set('sort_by', params.sort_by.trim())
   if (params.sort_dir) q.set('sort_dir', params.sort_dir)
@@ -147,7 +149,7 @@ export function buildOrdersExportQuery(params: Omit<OrdersListParams, 'page' | '
   if (params.search?.trim()) q.set('search', params.search.trim())
   if (params.status_id != null && params.status_id > 0) q.set('status_id', String(params.status_id))
   if (params.payment_status?.trim()) q.set('payment_status', params.payment_status.trim())
-  if (params.customer_id != null && params.customer_id > 0) q.set('customer_id', String(params.customer_id))
+  if (params.user_id?.trim()) q.set('user_id', params.user_id.trim())
   if (params.period) q.set('period', params.period)
   if (params.sort_by?.trim()) q.set('sort_by', params.sort_by.trim())
   if (params.sort_dir) q.set('sort_dir', params.sort_dir)
@@ -227,10 +229,9 @@ export type OrderAdminSummary = {
   grand_total: number
 }
 
-export type OrderAdminCustomer = {
-  id: number
+export type OrderAdminUser = {
+  id: string
   name: string
-  customer_number: string
   email: string
   phone: string
   initials: string
@@ -267,7 +268,7 @@ export type OrderAdminDetails = {
   available_statuses: OrderAdminAvailableStatus[]
   items: OrderAdminLineItem[]
   order_summary: OrderAdminSummary
-  customer: OrderAdminCustomer | null
+  user: OrderAdminUser | null
   shipping_address: OrderAdminShipping | null
   payment: OrderAdminPayment
   status_history: OrderAdminHistoryEntry[]
@@ -334,20 +335,19 @@ function parseAdminDetails(raw: unknown): OrderAdminDetails {
     }
   }
 
-  let customer: OrderAdminCustomer | null = null
-  const cRaw = root.customer
-  if (cRaw && typeof cRaw === 'object' && !Array.isArray(cRaw)) {
-    const c = cRaw as Record<string, unknown>
-    const cid = pickNum(c, 'id')
-    if (cid !== undefined) {
-      customer = {
-        id: cid,
-        name: pickStr(c, 'name') ?? '',
-        customer_number: pickStr(c, 'customer_number') ?? '',
-        email: pickStr(c, 'email') ?? '',
-        phone: pickStr(c, 'phone') ?? '',
-        initials: pickStr(c, 'initials') ?? '',
-        avatar_color: pickStr(c, 'avatar_color') ?? '#3B82F6',
+  let user: OrderAdminUser | null = null
+  const uRaw = root.user ?? root.customer
+  if (uRaw && typeof uRaw === 'object' && !Array.isArray(uRaw)) {
+    const u = uRaw as Record<string, unknown>
+    const uid = pickUserPublicId(u.id)
+    if (uid) {
+      user = {
+        id: uid,
+        name: pickStr(u, 'name') ?? '',
+        email: pickStr(u, 'email') ?? '',
+        phone: pickStr(u, 'phone') ?? '',
+        initials: pickStr(u, 'initials') ?? '',
+        avatar_color: pickStr(u, 'avatar_color') ?? '#3B82F6',
       }
     }
   }
@@ -389,7 +389,7 @@ function parseAdminDetails(raw: unknown): OrderAdminDetails {
       tax_amount: pickNum(summary, 'tax_amount') ?? 0,
       grand_total: pickNum(summary, 'grand_total') ?? 0,
     },
-    customer,
+    user,
     shipping_address,
     payment: {
       method: typeof pay.method === 'string' ? pay.method : null,

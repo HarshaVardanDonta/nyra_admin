@@ -3,11 +3,11 @@ import { Link } from 'react-router-dom'
 import { useAuth } from '../contexts/use-auth'
 import { useToast } from '../contexts/use-toast'
 import {
-  deleteCustomer,
-  downloadCustomersExport,
-  fetchCustomersList,
-  type CustomerListItem,
-} from '../lib/api/customers'
+  deleteUser,
+  downloadUsersExport,
+  fetchUsersList,
+  type UserListItem,
+} from '../lib/api/users'
 import { resolveMediaUrl } from '../lib/media-url'
 
 const PER_PAGE = 10
@@ -56,7 +56,7 @@ export function CustomersPage() {
   const { showToast, showApiError } = useToast()
   const filterRef = useRef<HTMLDivElement>(null)
 
-  const [items, setItems] = useState<CustomerListItem[]>([])
+  const [items, setItems] = useState<UserListItem[]>([])
   const [pagination, setPagination] = useState({
     page: 1,
     perPage: PER_PAGE,
@@ -97,7 +97,7 @@ export function CustomersPage() {
     setLoading(true)
     try {
       const oc = orderChipToParam(orderChip)
-      const { items: rows, pagination: pag } = await fetchCustomersList(token, {
+      const { items: rows, pagination: pag } = await fetchUsersList(token, {
         search: searchDebounced || undefined,
         page,
         perPage: PER_PAGE,
@@ -131,7 +131,7 @@ export function CustomersPage() {
     }
     setExporting(true)
     try {
-      await downloadCustomersExport(token, {
+      await downloadUsersExport(token, {
         search: searchDebounced || undefined,
         orderCountGt: orderChipToParam(orderChip),
         sortBy,
@@ -145,18 +145,18 @@ export function CustomersPage() {
     }
   }
 
-  async function handleDelete(row: CustomerListItem) {
+  async function handleDelete(row: UserListItem) {
     if (!token) return
     if (
       !window.confirm(
-        `Delete customer “${row.name}”? This cannot be undone.`,
+        `Delete user “${row.name}”? This cannot be undone.`,
       )
     ) {
       return
     }
     try {
-      await deleteCustomer(token, row.id)
-      showToast('Customer deleted.', 'success')
+      await deleteUser(token, row.id)
+      showToast('User deleted.', 'success')
       void loadPage()
     } catch (e) {
       showApiError(e)
@@ -196,9 +196,9 @@ export function CustomersPage() {
     <div className="min-w-0 px-4 pt-6 pb-28 text-slate-900 dark:text-slate-50 sm:px-6 lg:p-10">
       <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Customers</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">Users</h1>
           <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-            Manage and view your customer base and their performance.
+            Manage and view shop users and their performance.
           </p>
         </div>
         <button
@@ -214,7 +214,7 @@ export function CustomersPage() {
               d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5m0 0l5-5m-5 5V4"
             />
           </svg>
-          {exporting ? 'Exporting…' : 'Export Customers'}
+          {exporting ? 'Exporting…' : 'Export users'}
         </button>
       </div>
 
@@ -234,7 +234,7 @@ export function CustomersPage() {
               type="search"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search customers by name or email…"
+              placeholder="Search users by name or email…"
               className="w-full rounded-lg border border-slate-200 bg-slate-50 py-2.5 pl-10 pr-3 text-sm outline-none ring-blue-500/30 focus:border-blue-500 focus:ring-2 dark:border-slate-700 dark:bg-slate-900/80 dark:focus:border-blue-500"
             />
           </div>
@@ -297,7 +297,7 @@ export function CustomersPage() {
         <div className="flex flex-wrap gap-2 border-b border-slate-100 px-4 py-3 dark:border-slate-800">
           {(
             [
-              { key: 'all' as const, label: 'All Customers' },
+              { key: 'all' as const, label: 'All users' },
               { key: 'gt0' as const, label: 'Order Count > 0' },
               { key: 'gt5' as const, label: 'Order Count > 5' },
               { key: 'gt10' as const, label: 'Order Count > 10' },
@@ -320,7 +320,7 @@ export function CustomersPage() {
 
         {!token ? (
           <p className="border-b border-slate-100 px-4 py-2 text-xs text-amber-700 dark:border-slate-800 dark:text-amber-200/90">
-            Sign in to load customers.
+            Sign in to load users.
           </p>
         ) : null}
 
@@ -328,7 +328,7 @@ export function CustomersPage() {
           <table className="min-w-full text-left text-sm">
             <thead>
               <tr className="border-b border-slate-100 text-[10px] font-semibold uppercase tracking-widest text-slate-400 dark:border-slate-800 dark:text-slate-500">
-                <th className="px-4 py-3">Customer name</th>
+                <th className="px-4 py-3">User</th>
                 <th className="px-4 py-3">Phone</th>
                 <th className="px-4 py-3">Email</th>
                 <th className="px-4 py-3">Total orders</th>
@@ -341,19 +341,19 @@ export function CustomersPage() {
               {loading ? (
                 <tr>
                   <td colSpan={7} className="px-4 py-12 text-center text-slate-500 dark:text-slate-400">
-                    Loading customers…
+                    Loading users…
                   </td>
                 </tr>
               ) : !token ? (
                 <tr>
                   <td colSpan={7} className="px-4 py-12 text-center text-slate-500 dark:text-slate-400">
-                    Sign in to view customers.
+                    Sign in to view users.
                   </td>
                 </tr>
               ) : items.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="px-4 py-12 text-center text-slate-500 dark:text-slate-400">
-                    No customers match this view.
+                    No users match this view.
                   </td>
                 </tr>
               ) : (
@@ -380,7 +380,7 @@ export function CustomersPage() {
                           </div>
                           <div className="min-w-0">
                             <Link
-                              to={`/customers/${row.id}`}
+                              to={`/users/${encodeURIComponent(row.id)}`}
                               className="font-medium text-slate-900 hover:text-blue-600 dark:text-slate-100 dark:hover:text-blue-400"
                             >
                               {row.name}
@@ -409,7 +409,7 @@ export function CustomersPage() {
                       <td className="px-4 py-3 text-right">
                         <div className="flex justify-end gap-0.5">
                           <Link
-                            to={`/customers/${row.id}`}
+                            to={`/users/${encodeURIComponent(row.id)}`}
                             className="rounded-lg p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100"
                             title="View"
                           >
@@ -423,7 +423,7 @@ export function CustomersPage() {
                             </svg>
                           </Link>
                           <Link
-                            to={`/customers/${row.id}/edit`}
+                            to={`/users/${encodeURIComponent(row.id)}/edit`}
                             className="rounded-lg p-2 text-slate-500 transition hover:bg-slate-100 hover:text-blue-600 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-blue-400"
                             title="Edit"
                           >

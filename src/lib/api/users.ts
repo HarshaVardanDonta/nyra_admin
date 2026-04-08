@@ -31,8 +31,43 @@ function asRecord(v: unknown): Record<string, unknown> | null {
   return v as Record<string, unknown>
 }
 
-export type CustomerListItem = {
-  id: number
+/** Normalize API `id` (string `usr_…` or legacy number) for URLs and requests. */
+export function pickUserPublicId(rawId: unknown): string | null {
+  if (typeof rawId === 'string') {
+    const s = rawId.trim()
+    if (/^usr_\d+$/.test(s)) return s
+    if (/^\d+$/.test(s)) return `usr_${s}`
+    return null
+  }
+  if (typeof rawId === 'number' && Number.isFinite(rawId)) {
+    return `usr_${Math.trunc(rawId)}`
+  }
+  return null
+}
+
+/** Accept `usr_5` or `5` from the router; returns canonical `usr_5` or null. */
+export function parseUserIdRouteParam(param: string | undefined): string | null {
+  const s = param?.trim() ?? ''
+  if (/^usr_\d+$/.test(s)) return s
+  if (/^\d+$/.test(s)) return `usr_${s}`
+  return null
+}
+
+function userApiPath(userPublicId: string): string {
+  return `${API}/users/${encodeURIComponent(userPublicId)}`
+}
+
+/** Backend order list filter still expects a numeric `user_id` query value. */
+export function userPublicIdToOrderListQuery(id: string): string | undefined {
+  const s = id.trim()
+  const m = /^usr_(\d+)$/.exec(s)
+  if (m) return m[1]
+  if (/^\d+$/.test(s)) return s
+  return undefined
+}
+
+export type UserListItem = {
+  id: string
   name: string
   initials: string
   avatarColor: string
@@ -45,14 +80,14 @@ export type CustomerListItem = {
   status: string
 }
 
-export type CustomersPagination = {
+export type UsersPagination = {
   page: number
   perPage: number
   total: number
   totalPages: number
 }
 
-export type CustomersListParams = {
+export type UsersListParams = {
   search?: string
   page?: number
   perPage?: number
@@ -61,11 +96,11 @@ export type CustomersListParams = {
   sortDir?: 'asc' | 'desc'
 }
 
-function normalizeListItem(raw: unknown): CustomerListItem | null {
+function normalizeListItem(raw: unknown): UserListItem | null {
   const o = asRecord(raw)
   if (!o) return null
-  const id = pickNum(o, 'id')
-  if (id === undefined) return null
+  const id = pickUserPublicId(o.id)
+  if (!id) return null
   const name = pickStr(o, 'name') ?? ''
   return {
     id,
@@ -82,10 +117,10 @@ function normalizeListItem(raw: unknown): CustomerListItem | null {
   }
 }
 
-export async function fetchCustomersList(
+export async function fetchUsersList(
   token: string | null,
-  params: CustomersListParams,
-): Promise<{ items: CustomerListItem[]; pagination: CustomersPagination }> {
+  params: UsersListParams,
+): Promise<{ items: UserListItem[]; pagination: UsersPagination }> {
   const q = new URLSearchParams()
   if (params.search?.trim()) q.set('search', params.search.trim())
   if (params.page != null && params.page > 0) q.set('page', String(params.page))
@@ -93,10 +128,10 @@ export async function fetchCustomersList(
   if (params.orderCountGt != null) q.set('order_count_gt', String(params.orderCountGt))
   if (params.sortBy?.trim()) q.set('sort_by', params.sortBy.trim())
   if (params.sortDir) q.set('sort_dir', params.sortDir)
-  const raw = await request<unknown>(`${API}/customers?${q}`, { method: 'GET', token })
+  const raw = await request<unknown>(`${API}/users?${q}`, { method: 'GET', token })
   const root = asRecord(raw) ?? {}
   const data = root.data
-  const items: CustomerListItem[] = []
+  const items: UserListItem[] = []
   if (Array.isArray(data)) {
     for (const row of data) {
       const it = normalizeListItem(row)
@@ -121,20 +156,19 @@ function parseFilenameFromDisposition(cd: string | null): string | null {
   return m?.[1]?.replace(/^["']|["']$/g, '') ?? null
 }
 
-/** Triggers browser download of CSV from GET /customers/export */
-export async function downloadCustomersExport(
+export async function downloadUsersExport(
   token: string | null,
-  params: Omit<CustomersListParams, 'page' | 'perPage'>,
+  params: Omit<UsersListParams, 'page' | 'perPage'>,
 ): Promise<void> {
   const q = new URLSearchParams()
   if (params.search?.trim()) q.set('search', params.search.trim())
   if (params.orderCountGt != null) q.set('order_count_gt', String(params.orderCountGt))
   if (params.sortBy?.trim()) q.set('sort_by', params.sortBy.trim())
   if (params.sortDir) q.set('sort_dir', params.sortDir)
-  const res = await fetchWithAuthRetry(`${API}/customers/export?${q}`, { method: 'GET', token })
+  const res = await fetchWithAuthRetry(`${API}/users/export?${q}`, { method: 'GET', token })
   const blob = await res.blob()
   const name =
-    parseFilenameFromDisposition(res.headers.get('Content-Disposition')) ?? 'customers-export.csv'
+    parseFilenameFromDisposition(res.headers.get('Content-Disposition')) ?? 'users-export.csv'
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
@@ -146,8 +180,8 @@ export async function downloadCustomersExport(
   URL.revokeObjectURL(url)
 }
 
-export type CustomerProfileDetail = {
-  id: number
+export type UserProfileDetail = {
+  id: string
   name: string
   initials: string
   avatarColor: string
@@ -161,7 +195,7 @@ export type CustomerProfileDetail = {
   joinedDate: string
 }
 
-export type CustomerDetailKPIs = {
+export type UserDetailKPIs = {
   totalOrders: {
     value: number
     changePercent: number
@@ -183,7 +217,7 @@ export type CustomerDetailKPIs = {
   }
 }
 
-export type CustomerDetailAddress = {
+export type UserDetailAddress = {
   id: number
   label: string
   tag: string
@@ -191,15 +225,16 @@ export type CustomerDetailAddress = {
   fullAddress: string
 }
 
-export type CustomerDetailView = {
-  profile: CustomerProfileDetail
-  kpis: CustomerDetailKPIs
-  addresses: CustomerDetailAddress[]
+export type UserDetailView = {
+  profile: UserProfileDetail
+  kpis: UserDetailKPIs
+  addresses: UserDetailAddress[]
 }
 
-function normalizeDetailProfile(o: Record<string, unknown>): CustomerProfileDetail {
+function normalizeDetailProfile(o: Record<string, unknown>): UserProfileDetail {
+  const id = pickUserPublicId(o.id) ?? ''
   return {
-    id: pickNum(o, 'id') ?? 0,
+    id,
     name: pickStr(o, 'name') ?? '',
     initials: pickStr(o, 'initials') ?? '',
     avatarColor: pickStr(o, 'avatar_color') ?? '#3B82F6',
@@ -207,17 +242,19 @@ function normalizeDetailProfile(o: Record<string, unknown>): CustomerProfileDeta
     email: pickStr(o, 'email') ?? '',
     phone: pickStr(o, 'phone') ?? '',
     status: pickStr(o, 'status') ?? '',
-    membershipTier: pickStr(o, 'membership_tier') ?? '',
+    membershipTier: pickStr(o, 'membership_tier', 'membershipTier') ?? '',
     membershipSince:
       typeof o.membership_since === 'number' && Number.isFinite(o.membership_since)
         ? o.membership_since
-        : null,
+        : typeof o.membershipSince === 'number' && Number.isFinite(o.membershipSince)
+          ? o.membershipSince
+          : null,
     source: pickStr(o, 'source') ?? '',
-    joinedDate: pickStr(o, 'joined_date') ?? '',
+    joinedDate: pickStr(o, 'joined_date', 'joinedDate') ?? '',
   }
 }
 
-function normalizeKPIsBlock(raw: unknown): CustomerDetailKPIs {
+function normalizeKPIsBlock(raw: unknown): UserDetailKPIs {
   const o = asRecord(raw) ?? {}
   const to = asRecord(o.total_orders) ?? {}
   const ts = asRecord(o.total_spent) ?? {}
@@ -246,7 +283,7 @@ function normalizeKPIsBlock(raw: unknown): CustomerDetailKPIs {
   }
 }
 
-function normalizeDetailAddress(raw: unknown): CustomerDetailAddress | null {
+function normalizeDetailAddress(raw: unknown): UserDetailAddress | null {
   const o = asRecord(raw)
   if (!o) return null
   const id = pickNum(o, 'id')
@@ -260,18 +297,18 @@ function normalizeDetailAddress(raw: unknown): CustomerDetailAddress | null {
   }
 }
 
-export async function fetchCustomerDetails(
+export async function fetchUserDetails(
   token: string | null,
-  customerId: number,
-): Promise<CustomerDetailView> {
-  const raw = await request<unknown>(`${API}/customers/${customerId}/details`, {
+  userPublicId: string,
+): Promise<UserDetailView> {
+  const raw = await request<unknown>(`${userApiPath(userPublicId)}/details`, {
     method: 'GET',
     token,
   })
   const root = asRecord(raw) ?? {}
   const prof = asRecord(root.profile) ?? {}
   const addrsRaw = root.addresses
-  const addresses: CustomerDetailAddress[] = []
+  const addresses: UserDetailAddress[] = []
   if (Array.isArray(addrsRaw)) {
     for (const a of addrsRaw) {
       const row = normalizeDetailAddress(a)
@@ -285,7 +322,7 @@ export async function fetchCustomerDetails(
   }
 }
 
-export type CustomerOrderRow = {
+export type UserOrderRow = {
   orderId: string
   date: string
   itemsCount: number
@@ -294,7 +331,7 @@ export type CustomerOrderRow = {
   fulfillmentStatus: string
 }
 
-function normalizeOrderRow(raw: unknown): CustomerOrderRow | null {
+function normalizeOrderRow(raw: unknown): UserOrderRow | null {
   const o = asRecord(raw)
   if (!o) return null
   const orderId = pickStr(o, 'order_id')
@@ -309,7 +346,7 @@ function normalizeOrderRow(raw: unknown): CustomerOrderRow | null {
   }
 }
 
-export type CustomerOrdersParams = {
+export type UserOrdersParams = {
   page?: number
   perPage?: number
   status?: string
@@ -317,24 +354,24 @@ export type CustomerOrdersParams = {
   sortDir?: 'asc' | 'desc'
 }
 
-export async function fetchCustomerOrders(
+export async function fetchUserOrders(
   token: string | null,
-  customerId: number,
-  params: CustomerOrdersParams = {},
-): Promise<{ items: CustomerOrderRow[]; pagination: CustomersPagination }> {
+  userPublicId: string,
+  params: UserOrdersParams = {},
+): Promise<{ items: UserOrderRow[]; pagination: UsersPagination }> {
   const q = new URLSearchParams()
   if (params.page != null && params.page > 0) q.set('page', String(params.page))
   if (params.perPage != null && params.perPage > 0) q.set('per_page', String(params.perPage))
   if (params.status?.trim()) q.set('status', params.status.trim())
   if (params.sortBy?.trim()) q.set('sort_by', params.sortBy.trim())
   if (params.sortDir) q.set('sort_dir', params.sortDir)
-  const raw = await request<unknown>(`${API}/customers/${customerId}/orders?${q}`, {
+  const raw = await request<unknown>(`${userApiPath(userPublicId)}/orders?${q}`, {
     method: 'GET',
     token,
   })
   const root = asRecord(raw) ?? {}
   const data = root.data
-  const items: CustomerOrderRow[] = []
+  const items: UserOrderRow[] = []
   if (Array.isArray(data)) {
     for (const row of data) {
       const it = normalizeOrderRow(row)
@@ -353,23 +390,24 @@ export async function fetchCustomerOrders(
   }
 }
 
-export async function downloadCustomerOrdersExport(
+export async function downloadUserOrdersExport(
   token: string | null,
-  customerId: number,
-  params: Pick<CustomerOrdersParams, 'status' | 'sortBy' | 'sortDir'> = {},
+  userPublicId: string,
+  params: Pick<UserOrdersParams, 'status' | 'sortBy' | 'sortDir'> = {},
 ): Promise<void> {
   const q = new URLSearchParams()
   if (params.status?.trim()) q.set('status', params.status.trim())
   if (params.sortBy?.trim()) q.set('sort_by', params.sortBy.trim())
   if (params.sortDir) q.set('sort_dir', params.sortDir)
-  const res = await fetchWithAuthRetry(
-    `${API}/customers/${customerId}/orders/export?${q}`,
-    { method: 'GET', token },
-  )
+  const res = await fetchWithAuthRetry(`${userApiPath(userPublicId)}/orders/export?${q}`, {
+    method: 'GET',
+    token,
+  })
   const blob = await res.blob()
+  const enc = encodeURIComponent(userPublicId)
   const name =
     parseFilenameFromDisposition(res.headers.get('Content-Disposition')) ??
-    `customer-${customerId}-orders.csv`
+    `user-${enc}-orders.csv`
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
@@ -381,7 +419,7 @@ export async function downloadCustomerOrdersExport(
   URL.revokeObjectURL(url)
 }
 
-export type CustomerActivityItem = {
+export type UserActivityItem = {
   id: number
   eventType: string
   description: string
@@ -390,7 +428,7 @@ export type CustomerActivityItem = {
   createdAt: string
 }
 
-function normalizeActivityItem(raw: unknown): CustomerActivityItem | null {
+function normalizeActivityItem(raw: unknown): UserActivityItem | null {
   const o = asRecord(raw)
   if (!o) return null
   const id = pickNum(o, 'id')
@@ -405,20 +443,20 @@ function normalizeActivityItem(raw: unknown): CustomerActivityItem | null {
   }
 }
 
-export async function fetchCustomerActivity(
+export async function fetchUserActivity(
   token: string | null,
-  customerId: number,
+  userPublicId: string,
   page = 1,
   perPage = 20,
-): Promise<{ items: CustomerActivityItem[]; pagination: CustomersPagination }> {
+): Promise<{ items: UserActivityItem[]; pagination: UsersPagination }> {
   const q = new URLSearchParams({ page: String(page), per_page: String(perPage) })
-  const raw = await request<unknown>(`${API}/customers/${customerId}/activity?${q}`, {
+  const raw = await request<unknown>(`${userApiPath(userPublicId)}/activity?${q}`, {
     method: 'GET',
     token,
   })
   const root = asRecord(raw) ?? {}
   const data = root.data
-  const items: CustomerActivityItem[] = []
+  const items: UserActivityItem[] = []
   if (Array.isArray(data)) {
     for (const row of data) {
       const it = normalizeActivityItem(row)
@@ -437,8 +475,8 @@ export async function fetchCustomerActivity(
   }
 }
 
-export type CustomerRecord = {
-  id: number
+export type UserRecord = {
+  id: string
   firstName: string
   lastName: string
   email: string
@@ -452,11 +490,11 @@ export type CustomerRecord = {
   updatedAt: string
 }
 
-function normalizeCustomerRecord(raw: unknown): CustomerRecord | null {
+function normalizeUserRecord(raw: unknown): UserRecord | null {
   const o = asRecord(raw)
   if (!o) return null
-  const id = pickNum(o, 'id')
-  if (id === undefined) return null
+  const id = pickUserPublicId(o.id)
+  if (!id) return null
   return {
     id,
     firstName: pickStr(o, 'firstName', 'first_name') ?? '',
@@ -478,14 +516,14 @@ function normalizeCustomerRecord(raw: unknown): CustomerRecord | null {
   }
 }
 
-export async function fetchCustomer(token: string | null, customerId: number): Promise<CustomerRecord> {
-  const raw = await request<unknown>(`${API}/customers/${customerId}`, { method: 'GET', token })
-  const row = normalizeCustomerRecord(raw)
-  if (!row) throw new Error('Invalid customer response')
+export async function fetchUser(token: string | null, userPublicId: string): Promise<UserRecord> {
+  const raw = await request<unknown>(userApiPath(userPublicId), { method: 'GET', token })
+  const row = normalizeUserRecord(raw)
+  if (!row) throw new Error('Invalid user response')
   return row
 }
 
-export type CustomerWriteBody = {
+export type UserWriteBody = {
   firstName: string
   lastName: string
   email: string
@@ -497,11 +535,8 @@ export type CustomerWriteBody = {
   source: string
 }
 
-export async function createCustomer(
-  token: string,
-  body: CustomerWriteBody,
-): Promise<CustomerRecord> {
-  const raw = await request<unknown>(`${API}/customers`, {
+export async function createUser(token: string, body: UserWriteBody): Promise<UserRecord> {
+  const raw = await request<unknown>(`${API}/users`, {
     method: 'POST',
     token,
     body: {
@@ -516,17 +551,17 @@ export async function createCustomer(
       source: body.source,
     },
   })
-  const row = normalizeCustomerRecord(raw)
-  if (!row) throw new Error('Invalid create customer response')
+  const row = normalizeUserRecord(raw)
+  if (!row) throw new Error('Invalid create user response')
   return row
 }
 
-export async function updateCustomer(
+export async function updateUser(
   token: string,
-  customerId: number,
-  body: CustomerWriteBody,
-): Promise<CustomerRecord> {
-  const raw = await request<unknown>(`${API}/customers/${customerId}`, {
+  userPublicId: string,
+  body: UserWriteBody,
+): Promise<UserRecord> {
+  const raw = await request<unknown>(userApiPath(userPublicId), {
     method: 'PUT',
     token,
     body: {
@@ -541,13 +576,13 @@ export async function updateCustomer(
       source: body.source,
     },
   })
-  const row = normalizeCustomerRecord(raw)
-  if (!row) throw new Error('Invalid update customer response')
+  const row = normalizeUserRecord(raw)
+  if (!row) throw new Error('Invalid update user response')
   return row
 }
 
-export async function deleteCustomer(token: string, customerId: number): Promise<void> {
-  await request<undefined>(`${API}/customers/${customerId}`, { method: 'DELETE', token })
+export async function deleteUser(token: string, userPublicId: string): Promise<void> {
+  await request<undefined>(userApiPath(userPublicId), { method: 'DELETE', token })
 }
 
 export type AddressCreateBody = {
@@ -562,12 +597,12 @@ export type AddressCreateBody = {
   isDefault: boolean
 }
 
-export async function createCustomerAddress(
+export async function createUserAddress(
   token: string,
-  customerId: number,
+  userPublicId: string,
   body: AddressCreateBody,
 ): Promise<void> {
-  await request(`${API}/customers/${customerId}/addresses`, {
+  await request(`${userApiPath(userPublicId)}/addresses`, {
     method: 'POST',
     token,
     body: {
@@ -584,24 +619,24 @@ export async function createCustomerAddress(
   })
 }
 
-export async function deleteCustomerAddress(
+export async function deleteUserAddress(
   token: string,
-  customerId: number,
+  userPublicId: string,
   addressId: number,
 ): Promise<void> {
-  await request<undefined>(`${API}/customers/${customerId}/addresses/${addressId}`, {
+  await request<undefined>(`${userApiPath(userPublicId)}/addresses/${addressId}`, {
     method: 'DELETE',
     token,
   })
 }
 
-export async function setDefaultCustomerAddress(
+export async function setDefaultUserAddress(
   token: string,
-  customerId: number,
+  userPublicId: string,
   addressId: number,
 ): Promise<void> {
   await request<undefined>(
-    `${API}/customers/${customerId}/addresses/${addressId}/set-default`,
+    `${userApiPath(userPublicId)}/addresses/${addressId}/set-default`,
     { method: 'PATCH', token },
   )
 }

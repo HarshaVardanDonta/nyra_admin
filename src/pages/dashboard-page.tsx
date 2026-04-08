@@ -355,7 +355,7 @@ function RecentOrdersTable({ orders }: { orders: RecentOrder[] }) {
         <thead>
           <tr className="border-b border-slate-200 dark:border-slate-800 text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
             <th className="px-5 py-3">Order ID</th>
-            <th className="px-5 py-3">Customer</th>
+            <th className="px-5 py-3">User</th>
             <th className="px-5 py-3">Items</th>
             <th className="px-5 py-3">Total</th>
             <th className="px-5 py-3">Status</th>
@@ -375,16 +375,16 @@ function RecentOrdersTable({ orders }: { orders: RecentOrder[] }) {
               <td className="px-5 py-3.5">
                 <div className="flex items-center gap-2">
                   <span
-                    className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold text-white ${o.customer.avatarColor ? '' : 'bg-blue-600'}`}
+                    className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold text-white ${o.user.avatarColor ? '' : 'bg-blue-600'}`}
                     style={
-                      o.customer.avatarColor
-                        ? { backgroundColor: o.customer.avatarColor }
+                      o.user.avatarColor
+                        ? { backgroundColor: o.user.avatarColor }
                         : undefined
                     }
                   >
-                    {o.customer.initials || '—'}
+                    {o.user.initials || '—'}
                   </span>
-                  <span className="text-slate-900 dark:text-slate-50">{o.customer.name}</span>
+                  <span className="text-slate-900 dark:text-slate-50">{o.user.name}</span>
                 </div>
               </td>
               <td className="px-5 py-3.5 text-slate-500 dark:text-slate-400">

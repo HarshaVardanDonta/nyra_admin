@@ -12,6 +12,8 @@ type NavIconName =
   | 'layers'
   | 'ticket'
   | 'megaphone'
+  | 'document'
+  | 'layout'
   | 'users'
   | 'git'
   | 'chart'
@@ -77,6 +79,22 @@ function NavIcon({ name, className }: { name: NavIconName; className?: string })
       return (
         <svg className={c} fill="none" viewBox="0 0 24 24" strokeWidth={1.75} stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" d="M11 5L6 9H3v6h3l5 4V5zM15 9a4 4 0 010 6M19 5a8 8 0 010 14" />
+        </svg>
+      )
+    case 'document':
+      return (
+        <svg className={c} fill="none" viewBox="0 0 24 24" strokeWidth={1.75} stroke="currentColor">
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M9 12h6m-6 4h6M7 4h6l4 4v12a2 2 0 01-2 2H7a2 2 0 01-2-2V6a2 2 0 012-2z"
+          />
+        </svg>
+      )
+    case 'layout':
+      return (
+        <svg className={c} fill="none" viewBox="0 0 24 24" strokeWidth={1.75} stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M4 5h16v6H4V5zM4 13h10v6H4v-6zM16 13h4v6h-4v-6z" />
         </svg>
       )
     case 'users':
@@ -274,9 +292,11 @@ export function AdminDrawer({
         <NavGroup title="Marketing" collapsed={collapsed}>
           <NavRow to="/coupons" label="Coupons" icon="ticket" collapsed={collapsed} />
           <NavRow to="/promotions" label="Promotions" icon="megaphone" collapsed={collapsed} />
+          <NavRow to="/blogs" label="Blogs" icon="document" collapsed={collapsed} />
+          <NavRow to="/blog-promotions" label="Blog promotions" icon="layout" collapsed={collapsed} />
         </NavGroup>
         <NavGroup title="System" collapsed={collapsed}>
-          <NavRow to="/customers" label="Customers" icon="users" collapsed={collapsed} />
+          <NavRow to="/users" label="Users" icon="users" collapsed={collapsed} />
           <NavRow to="/order-lifecycle" label="Order lifecycle" icon="git" collapsed={collapsed} />
           <NavRow to="/analytics" label="Analytics" icon="chart" collapsed={collapsed} />
           <NavRow label="Settings" icon="settings" disabled collapsed={collapsed} />

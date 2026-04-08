@@ -3,19 +3,20 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useAuth } from '../contexts/use-auth'
 import { useToast } from '../contexts/use-toast'
 import {
-  createCustomerAddress,
-  deleteCustomer,
-  deleteCustomerAddress,
-  downloadCustomerOrdersExport,
-  fetchCustomerActivity,
-  fetchCustomerDetails,
-  fetchCustomerOrders,
-  setDefaultCustomerAddress,
-  type CustomerActivityItem,
-  type CustomerDetailAddress,
-  type CustomerDetailView,
-  type CustomerOrderRow,
-} from '../lib/api/customers'
+  createUserAddress,
+  deleteUser,
+  deleteUserAddress,
+  downloadUserOrdersExport,
+  fetchUserActivity,
+  fetchUserDetails,
+  fetchUserOrders,
+  parseUserIdRouteParam,
+  setDefaultUserAddress,
+  type UserActivityItem,
+  type UserDetailAddress,
+  type UserDetailView,
+  type UserOrderRow,
+} from '../lib/api/users'
 import { resolveMediaUrl } from '../lib/media-url'
 
 function formatMoney(n: number) {
@@ -97,17 +98,17 @@ function ActivityIcon({ eventType }: { eventType: string }) {
 const ORDERS_PER_PAGE = 8
 
 export function CustomerDetailPage() {
-  const { customerId: customerIdParam } = useParams<{ customerId: string }>()
-  const customerId = Number(customerIdParam)
+  const { userId: userIdParam } = useParams<{ userId: string }>()
+  const userId = parseUserIdRouteParam(userIdParam)
   const navigate = useNavigate()
   const { token } = useAuth()
   const { showToast, showApiError } = useToast()
 
-  const [detail, setDetail] = useState<CustomerDetailView | null>(null)
-  const [orders, setOrders] = useState<CustomerOrderRow[]>([])
+  const [detail, setDetail] = useState<UserDetailView | null>(null)
+  const [orders, setOrders] = useState<UserOrderRow[]>([])
   const [orderPag, setOrderPag] = useState({ page: 1, total: 0, totalPages: 0 })
   const [orderPage, setOrderPage] = useState(1)
-  const [activity, setActivity] = useState<CustomerActivityItem[]>([])
+  const [activity, setActivity] = useState<UserActivityItem[]>([])
   const [loading, setLoading] = useState(true)
   const [deleting, setDeleting] = useState(false)
   const [orderStatusFilter, setOrderStatusFilter] = useState('')
@@ -128,17 +129,17 @@ export function CustomerDetailPage() {
   })
 
   const reloadDetail = useCallback(async () => {
-    if (!token || !Number.isFinite(customerId) || customerId <= 0) return
-    const d = await fetchCustomerDetails(token, customerId)
+    if (!token || !userId) return
+    const d = await fetchUserDetails(token, userId)
     setDetail(d)
-  }, [token, customerId])
+  }, [token, userId])
 
   const reloadOrders = useCallback(
     async (page: number) => {
-      if (!token || !Number.isFinite(customerId) || customerId <= 0) return
+      if (!token || !userId) return
       setOrdersLoading(true)
       try {
-        const { items, pagination } = await fetchCustomerOrders(token, customerId, {
+        const { items, pagination } = await fetchUserOrders(token, userId, {
           page,
           perPage: ORDERS_PER_PAGE,
           status: orderStatusFilter.trim() || undefined,
@@ -156,15 +157,15 @@ export function CustomerDetailPage() {
         setOrdersLoading(false)
       }
     },
-    [token, customerId, orderStatusFilter, showApiError],
+    [token, userId, orderStatusFilter, showApiError],
   )
 
   useLayoutEffect(() => {
     setOrderPage(1)
-  }, [customerId, orderStatusFilter])
+  }, [userId, orderStatusFilter])
 
   useEffect(() => {
-    if (!token || !Number.isFinite(customerId) || customerId <= 0) {
+    if (!token || !userId) {
       setDetail(null)
       setLoading(false)
       return
@@ -176,8 +177,8 @@ export function CustomerDetailPage() {
       setActivity([])
       try {
         const [d, act] = await Promise.all([
-          fetchCustomerDetails(token, customerId),
-          fetchCustomerActivity(token, customerId, 1, 25),
+          fetchUserDetails(token, userId),
+          fetchUserActivity(token, userId, 1, 25),
         ])
         if (cancelled) return
         setDetail(d)
@@ -194,21 +195,21 @@ export function CustomerDetailPage() {
     return () => {
       cancelled = true
     }
-  }, [token, customerId, showApiError])
+  }, [token, userId, showApiError])
 
   useEffect(() => {
-    if (!token || !Number.isFinite(customerId) || customerId <= 0) return
+    if (!token || !userId) return
     void reloadOrders(orderPage)
-  }, [token, customerId, orderPage, reloadOrders])
+  }, [token, userId, orderPage, reloadOrders])
 
-  async function handleDeleteCustomer() {
-    if (!token || !detail) return
-    if (!window.confirm(`Delete customer “${detail.profile.name}”? This cannot be undone.`)) return
+  async function handleDeleteUser() {
+    if (!token || !detail || !userId) return
+    if (!window.confirm(`Delete user “${detail.profile.name}”? This cannot be undone.`)) return
     setDeleting(true)
     try {
-      await deleteCustomer(token, customerId)
-      showToast('Customer deleted.', 'success')
-      navigate('/customers', { replace: true })
+      await deleteUser(token, userId)
+      showToast('User deleted.', 'success')
+      navigate('/users', { replace: true })
     } catch (e) {
       showApiError(e)
     } finally {
@@ -217,10 +218,10 @@ export function CustomerDetailPage() {
   }
 
   async function handleOrdersExport() {
-    if (!token) return
+    if (!token || !userId) return
     setExportingOrders(true)
     try {
-      await downloadCustomerOrdersExport(token, customerId, {
+      await downloadUserOrdersExport(token, userId, {
         status: orderStatusFilter.trim() || undefined,
       })
       showToast('Order export started.', 'success')
@@ -233,10 +234,10 @@ export function CustomerDetailPage() {
 
   async function submitAddress(e: React.FormEvent) {
     e.preventDefault()
-    if (!token) return
+    if (!token || !userId) return
     setAddressSaving(true)
     try {
-      await createCustomerAddress(token, customerId, {
+      await createUserAddress(token, userId, {
         label: addrForm.label.trim(),
         tag: addrForm.tag.trim(),
         addressLine1: addrForm.addressLine1.trim(),
@@ -268,11 +269,11 @@ export function CustomerDetailPage() {
     }
   }
 
-  async function handleDeleteAddress(a: CustomerDetailAddress) {
-    if (!token) return
+  async function handleDeleteAddress(a: UserDetailAddress) {
+    if (!token || !userId) return
     if (!window.confirm('Remove this address?')) return
     try {
-      await deleteCustomerAddress(token, customerId, a.id)
+      await deleteUserAddress(token, userId, a.id)
       showToast('Address removed.', 'success')
       await reloadDetail()
     } catch (e) {
@@ -280,10 +281,10 @@ export function CustomerDetailPage() {
     }
   }
 
-  async function handleSetDefault(a: CustomerDetailAddress) {
-    if (!token || a.isDefault) return
+  async function handleSetDefault(a: UserDetailAddress) {
+    if (!token || !userId || a.isDefault) return
     try {
-      await setDefaultCustomerAddress(token, customerId, a.id)
+      await setDefaultUserAddress(token, userId, a.id)
       showToast('Default address updated.', 'success')
       await reloadDetail()
     } catch (e) {
@@ -291,10 +292,10 @@ export function CustomerDetailPage() {
     }
   }
 
-  if (!Number.isFinite(customerId) || customerId <= 0) {
+  if (!userId) {
     return (
       <div className="min-w-0 px-4 py-6 text-sm text-slate-500 dark:text-slate-400 sm:px-6 lg:p-10">
-        Invalid customer id.
+        Invalid user id.
       </div>
     )
   }
@@ -302,7 +303,7 @@ export function CustomerDetailPage() {
   if (!token) {
     return (
       <div className="min-w-0 px-4 py-6 text-sm text-slate-500 dark:text-slate-400 sm:px-6 lg:p-10">
-        Sign in to view this customer.
+        Sign in to view this user.
       </div>
     )
   }
@@ -310,7 +311,7 @@ export function CustomerDetailPage() {
   if (loading || !detail) {
     return (
       <div className="flex min-h-[50vh] items-center justify-center text-sm text-slate-500 dark:text-slate-400">
-        {loading ? 'Loading…' : 'Customer not found.'}
+        {loading ? 'Loading…' : 'User not found.'}
       </div>
     )
   }
@@ -324,15 +325,15 @@ export function CustomerDetailPage() {
     if (tier && y) return `${tier} member since ${y}`
     if (tier) return tier
     if (y) return `Member since ${y}`
-    return 'Customer'
+    return 'Member'
   })()
   const mailto = profile.email ? `mailto:${encodeURIComponent(profile.email)}` : ''
 
   return (
     <div className="min-w-0 px-4 pt-6 pb-28 text-slate-900 dark:text-slate-50 sm:px-6 lg:p-10">
       <nav className="mb-4 text-[11px] font-semibold uppercase tracking-widest text-blue-600 dark:text-blue-400">
-        <Link to="/customers" className="transition hover:underline">
-          Customers
+        <Link to="/users" className="transition hover:underline">
+          Users
         </Link>
         <span className="mx-2 text-slate-400">/</span>
         <span className="text-slate-500 dark:text-slate-400">Details</span>
@@ -340,11 +341,11 @@ export function CustomerDetailPage() {
 
       <div className="mb-8 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <h1 className="text-2xl font-semibold tracking-tight">
-          Customer Details: {profile.name}
+          User details: {profile.name}
         </h1>
         <div className="flex flex-wrap gap-2">
           <Link
-            to={`/customers/${customerId}/edit`}
+            to={`/users/${encodeURIComponent(userId)}/edit`}
             className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-800 transition hover:bg-slate-50 dark:border-slate-600 dark:bg-[#0f1419] dark:text-slate-100 dark:hover:bg-slate-800"
           >
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.75} stroke="currentColor">
@@ -354,12 +355,12 @@ export function CustomerDetailPage() {
                 d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"
               />
             </svg>
-            Edit Customer
+            Edit user
           </Link>
           <button
             type="button"
             disabled={deleting}
-            onClick={() => void handleDeleteCustomer()}
+            onClick={() => void handleDeleteUser()}
             className="inline-flex items-center gap-2 rounded-lg border border-red-500/50 bg-white px-4 py-2 text-sm font-medium text-red-600 transition hover:bg-red-500/5 disabled:opacity-50 dark:bg-[#0f1419] dark:text-red-400"
           >
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.75} stroke="currentColor">
@@ -369,7 +370,7 @@ export function CustomerDetailPage() {
                 d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
               />
             </svg>
-            {deleting ? 'Deleting…' : 'Delete Customer'}
+            {deleting ? 'Deleting…' : 'Delete user'}
           </button>
         </div>
       </div>
@@ -637,10 +638,10 @@ export function CustomerDetailPage() {
             </div>
             <div className="flex flex-col gap-2 border-t border-slate-100 px-4 py-3 dark:border-slate-800 sm:flex-row sm:items-center sm:justify-between">
               <Link
-                to="/customers"
+                to="/users"
                 className="text-sm font-medium text-blue-600 hover:underline dark:text-blue-400"
               >
-                View all customers
+                View all users
               </Link>
               {orderPag.totalPages > 1 ? (
                 <div className="flex items-center gap-2">

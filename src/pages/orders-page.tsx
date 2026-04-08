@@ -11,7 +11,7 @@ import {
   fetchOrderInvoiceJson,
   fetchOrders,
 } from '../lib/api/orders'
-import { fetchCustomersList } from '../lib/api/customers'
+import { fetchUsersList, userPublicIdToOrderListQuery } from '../lib/api/users'
 
 const PER_PAGE = 10
 
@@ -94,11 +94,11 @@ export function OrdersPage() {
   const [searchDebounced, setSearchDebounced] = useState('')
   const [statusId, setStatusId] = useState<string>('')
   const [period, setPeriod] = useState<OrdersListParams['period']>('30d')
-  const [customerId, setCustomerId] = useState<string>('')
+  const [userFilterId, setUserFilterId] = useState<string>('')
   const [paymentStatus, setPaymentStatus] = useState('')
 
   const [statusOptions, setStatusOptions] = useState<{ id: number; name: string }[]>([])
-  const [customerOptions, setCustomerOptions] = useState<{ id: number; name: string }[]>([])
+  const [userOptions, setUserOptions] = useState<{ id: string; name: string }[]>([])
 
   useEffect(() => {
     const t = window.setTimeout(() => setSearchDebounced(search.trim()), 350)
@@ -126,11 +126,11 @@ export function OrdersPage() {
     let cancelled = false
     void (async () => {
       try {
-        const { items } = await fetchCustomersList(token, { page: 1, perPage: 100, sortBy: 'name', sortDir: 'asc' })
+        const { items } = await fetchUsersList(token, { page: 1, perPage: 100, sortBy: 'name', sortDir: 'asc' })
         if (cancelled) return
-        setCustomerOptions(items.map((c) => ({ id: c.id, name: c.name || c.email })))
+        setUserOptions(items.map((c) => ({ id: c.id, name: c.name || c.email })))
       } catch {
-        if (!cancelled) setCustomerOptions([])
+        if (!cancelled) setUserOptions([])
       }
     })()
     return () => {
@@ -140,13 +140,14 @@ export function OrdersPage() {
 
   const listParams = useMemo((): OrdersListParams => {
     const sid = statusId ? Number.parseInt(statusId, 10) : undefined
-    const cid = customerId ? Number.parseInt(customerId, 10) : undefined
+    const uid =
+      userFilterId.trim() ? userPublicIdToOrderListQuery(userFilterId.trim()) : undefined
     return {
       search: searchDebounced || undefined,
       page: pagination.page,
       per_page: pagination.perPage,
       status_id: sid && Number.isFinite(sid) && sid > 0 ? sid : undefined,
-      customer_id: cid && Number.isFinite(cid) && cid > 0 ? cid : undefined,
+      user_id: uid,
       period: period ?? '30d',
       payment_status: paymentStatus || undefined,
       sort_by: 'date',
@@ -157,7 +158,7 @@ export function OrdersPage() {
     pagination.page,
     pagination.perPage,
     statusId,
-    customerId,
+    userFilterId,
     period,
     paymentStatus,
   ])
@@ -166,7 +167,7 @@ export function OrdersPage() {
     () => ({
       search: listParams.search,
       status_id: listParams.status_id,
-      customer_id: listParams.customer_id,
+      user_id: listParams.user_id,
       period: listParams.period,
       payment_status: listParams.payment_status,
       sort_by: listParams.sort_by,
@@ -200,7 +201,7 @@ export function OrdersPage() {
 
   useEffect(() => {
     setPagination((p) => ({ ...p, page: 1 }))
-  }, [searchDebounced, statusId, customerId, period, paymentStatus])
+  }, [searchDebounced, statusId, userFilterId, period, paymentStatus])
 
   async function handleExport() {
     setExporting(true)
@@ -276,7 +277,7 @@ export function OrdersPage() {
             type="search"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Filter by Order ID, Customer…"
+            placeholder="Filter by order ID or user…"
             className="w-full rounded-lg border border-slate-200 bg-white py-2 pl-10 pr-3 text-sm dark:border-slate-600 dark:bg-slate-900"
           />
         </div>
@@ -304,13 +305,13 @@ export function OrdersPage() {
           ))}
         </select>
         <select
-          value={customerId}
-          onChange={(e) => setCustomerId(e.target.value)}
+          value={userFilterId}
+          onChange={(e) => setUserFilterId(e.target.value)}
           className="select-tail w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-900 lg:w-auto"
         >
-          <option value="">All customers</option>
-          {customerOptions.map((c) => (
-            <option key={c.id} value={String(c.id)}>
+          <option value="">All users</option>
+          {userOptions.map((c) => (
+            <option key={c.id} value={c.id}>
               {c.name}
             </option>
           ))}
@@ -334,7 +335,7 @@ export function OrdersPage() {
             <thead>
               <tr className="border-b border-slate-200 text-xs font-medium uppercase tracking-wide text-slate-500 dark:border-slate-800 dark:text-slate-400">
                 <th className="px-4 py-3">Order ID</th>
-                <th className="px-4 py-3">Customer</th>
+                <th className="px-4 py-3">User</th>
                 <th className="px-4 py-3">Items</th>
                 <th className="px-4 py-3">Value</th>
                 <th className="px-4 py-3">Payment</th>
@@ -368,15 +369,15 @@ export function OrdersPage() {
                       </Link>
                     </td>
                     <td className="px-4 py-3">
-                      {row.customer ? (
+                      {row.user ? (
                         <div className="flex items-center gap-2">
                           <span
                             className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold text-white"
-                            style={{ backgroundColor: row.customer.avatar_color }}
+                            style={{ backgroundColor: row.user.avatar_color }}
                           >
-                            {row.customer.initials || '?'}
+                            {row.user.initials || '?'}
                           </span>
-                          <span className="font-medium text-slate-800 dark:text-slate-200">{row.customer.name}</span>
+                          <span className="font-medium text-slate-800 dark:text-slate-200">{row.user.name}</span>
                         </div>
                       ) : (
                         <span className="text-slate-500 dark:text-slate-400">—</span>

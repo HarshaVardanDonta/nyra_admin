@@ -433,7 +433,7 @@ export function AnalyticsPage() {
             <div className="min-w-0 rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-900">
               <div className="flex items-center justify-between">
                 <h2 className="text-base font-semibold text-slate-900 dark:text-slate-50">
-                  Top Customers
+                  Top users
                 </h2>
                 <button
                   type="button"
@@ -446,7 +446,7 @@ export function AnalyticsPage() {
               <ul className="mt-4 flex flex-col divide-y divide-slate-200 dark:divide-slate-700">
                 {data.top_customers.length === 0 ? (
                   <li className="py-6 text-center text-sm text-slate-500 dark:text-slate-400">
-                    No customers
+                    No users yet
                   </li>
                 ) : (
                   data.top_customers.map((c) => (

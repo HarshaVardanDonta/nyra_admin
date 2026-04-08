@@ -2,11 +2,11 @@ import { useCallback, useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useAuth } from '../contexts/use-auth'
 import { useToast } from '../contexts/use-toast'
-import { fetchCustomer, updateCustomer, type CustomerWriteBody } from '../lib/api/customers'
+import { fetchUser, parseUserIdRouteParam, updateUser, type UserWriteBody } from '../lib/api/users'
 
 export function CustomerEditorPage() {
-  const { customerId: idParam } = useParams<{ customerId: string }>()
-  const customerId = Number(idParam)
+  const { userId: idParam } = useParams<{ userId: string }>()
+  const userId = parseUserIdRouteParam(idParam)
   const navigate = useNavigate()
   const { token } = useAuth()
   const { showToast, showApiError } = useToast()
@@ -24,10 +24,10 @@ export function CustomerEditorPage() {
   const [source, setSource] = useState('')
 
   const load = useCallback(async () => {
-    if (!token || !Number.isFinite(customerId) || customerId <= 0) return
+    if (!token || !userId) return
     setLoading(true)
     try {
-      const c = await fetchCustomer(token, customerId)
+      const c = await fetchUser(token, userId)
       setFirstName(c.firstName)
       setLastName(c.lastName)
       setEmail(c.email)
@@ -46,7 +46,7 @@ export function CustomerEditorPage() {
     } finally {
       setLoading(false)
     }
-  }, [token, customerId, showApiError])
+  }, [token, userId, showApiError])
 
   useEffect(() => {
     void load()
@@ -54,7 +54,7 @@ export function CustomerEditorPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (!token || !Number.isFinite(customerId) || customerId <= 0) return
+    if (!token || !userId) return
     const ms = membershipSince.trim()
     let membershipSinceNum: number | null = null
     if (ms !== '') {
@@ -65,7 +65,7 @@ export function CustomerEditorPage() {
       }
       membershipSinceNum = Math.trunc(n)
     }
-    const body: CustomerWriteBody = {
+    const body: UserWriteBody = {
       firstName: firstName.trim(),
       lastName: lastName.trim(),
       email: email.trim(),
@@ -78,9 +78,9 @@ export function CustomerEditorPage() {
     }
     setSaving(true)
     try {
-      await updateCustomer(token, customerId, body)
-      showToast('Customer updated.', 'success')
-      navigate(`/customers/${customerId}`, { replace: true })
+      await updateUser(token, userId, body)
+      showToast('User updated.', 'success')
+      navigate(`/users/${encodeURIComponent(userId)}`, { replace: true })
     } catch (err) {
       showApiError(err)
     } finally {
@@ -88,10 +88,10 @@ export function CustomerEditorPage() {
     }
   }
 
-  if (!Number.isFinite(customerId) || customerId <= 0) {
+  if (!userId) {
     return (
       <div className="min-w-0 px-4 py-6 text-sm text-slate-500 dark:text-slate-400 sm:px-6 lg:p-10">
-        Invalid customer id.
+        Invalid user id.
       </div>
     )
   }
@@ -99,7 +99,7 @@ export function CustomerEditorPage() {
   if (!token) {
     return (
       <div className="min-w-0 px-4 py-6 text-sm text-slate-500 dark:text-slate-400 sm:px-6 lg:p-10">
-        Sign in to edit this customer.
+        Sign in to edit this user.
       </div>
     )
   }
@@ -115,20 +115,20 @@ export function CustomerEditorPage() {
   return (
     <div className="min-w-0 px-4 pt-6 pb-28 text-slate-900 dark:text-slate-50 sm:px-6 lg:p-10">
       <nav className="mb-4 text-[11px] font-semibold uppercase tracking-widest text-blue-600 dark:text-blue-400">
-        <Link to="/customers" className="transition hover:underline">
-          Customers
+        <Link to="/users" className="transition hover:underline">
+          Users
         </Link>
         <span className="mx-2 text-slate-400">/</span>
-        <Link to={`/customers/${customerId}`} className="transition hover:underline">
+        <Link to={`/users/${encodeURIComponent(userId)}`} className="transition hover:underline">
           Details
         </Link>
         <span className="mx-2 text-slate-400">/</span>
         <span className="text-slate-500 dark:text-slate-400">Edit</span>
       </nav>
 
-      <h1 className="text-2xl font-semibold tracking-tight">Edit customer</h1>
+      <h1 className="text-2xl font-semibold tracking-tight">Edit user</h1>
       <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-        Update profile fields stored for this customer.
+        Update profile fields stored for this user.
       </p>
 
       <form
@@ -226,7 +226,7 @@ export function CustomerEditorPage() {
             {saving ? 'Saving…' : 'Save changes'}
           </button>
           <Link
-            to={`/customers/${customerId}`}
+            to={`/users/${encodeURIComponent(userId)}`}
             className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
           >
             Cancel

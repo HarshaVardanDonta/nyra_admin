@@ -69,6 +69,30 @@ const PromotionDetailPage = lazy(() =>
   import('./pages/promotion-detail-page').then((m) => ({ default: m.PromotionDetailPage })),
 )
 
+const BlogsPage = lazy(() =>
+  import('./pages/blogs-page').then((m) => ({ default: m.BlogsPage })),
+)
+
+const BlogEditorPage = lazy(() =>
+  import('./pages/blog-editor-page').then((m) => ({ default: m.BlogEditorPage })),
+)
+
+const BlogDetailPage = lazy(() =>
+  import('./pages/blog-detail-page').then((m) => ({ default: m.BlogDetailPage })),
+)
+
+const BlogPromotionsPage = lazy(() =>
+  import('./pages/blog-promotions-page').then((m) => ({ default: m.BlogPromotionsPage })),
+)
+
+const BlogPromotionEditorPage = lazy(() =>
+  import('./pages/blog-promotion-editor-page').then((m) => ({ default: m.BlogPromotionEditorPage })),
+)
+
+const BlogPromotionDetailPage = lazy(() =>
+  import('./pages/blog-promotion-detail-page').then((m) => ({ default: m.BlogPromotionDetailPage })),
+)
+
 const OrderLifecyclePage = lazy(() =>
   import('./pages/order-lifecycle-page').then((m) => ({ default: m.OrderLifecyclePage })),
 )
@@ -283,6 +307,70 @@ function App() {
                   }
                 />
                 <Route
+                  path="/blogs"
+                  element={
+                    <Suspense fallback={pageFallback}>
+                      <BlogsPage />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="/blogs/new"
+                  element={
+                    <Suspense fallback={pageFallback}>
+                      <BlogEditorPage />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="/blogs/:blogId/edit"
+                  element={
+                    <Suspense fallback={pageFallback}>
+                      <BlogEditorPage />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="/blogs/:blogId"
+                  element={
+                    <Suspense fallback={pageFallback}>
+                      <BlogDetailPage />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="/blog-promotions"
+                  element={
+                    <Suspense fallback={pageFallback}>
+                      <BlogPromotionsPage />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="/blog-promotions/new"
+                  element={
+                    <Suspense fallback={pageFallback}>
+                      <BlogPromotionEditorPage />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="/blog-promotions/:blogPromotionId/edit"
+                  element={
+                    <Suspense fallback={pageFallback}>
+                      <BlogPromotionEditorPage />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="/blog-promotions/:blogPromotionId"
+                  element={
+                    <Suspense fallback={pageFallback}>
+                      <BlogPromotionDetailPage />
+                    </Suspense>
+                  }
+                />
+                <Route
                   path="/orders"
                   element={
                     <Suspense fallback={pageFallback}>
@@ -339,7 +427,7 @@ function App() {
                   }
                 />
                 <Route
-                  path="/customers"
+                  path="/users"
                   element={
                     <Suspense fallback={pageFallback}>
                       <CustomersPage />
@@ -347,7 +435,7 @@ function App() {
                   }
                 />
                 <Route
-                  path="/customers/:customerId"
+                  path="/users/:userId"
                   element={
                     <Suspense fallback={pageFallback}>
                       <CustomerDetailPage />
@@ -355,7 +443,7 @@ function App() {
                   }
                 />
                 <Route
-                  path="/customers/:customerId/edit"
+                  path="/users/:userId/edit"
                   element={
                     <Suspense fallback={pageFallback}>
                       <CustomerEditorPage />
