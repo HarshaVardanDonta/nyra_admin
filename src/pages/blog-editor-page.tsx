@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { BlogRichTextEditor } from '../components/blog-rich-text-editor'
+import { BlogBodyEditorJs } from '../components/blog-body-editorjs'
+import { ErrorBoundary } from '../components/error-boundary'
 import { BlogLocalImagesProvider, useBlogLocalImages } from '../contexts/blog-local-images-context'
 import { useAuth } from '../contexts/use-auth'
 import { useToast } from '../contexts/use-toast'
@@ -43,8 +44,9 @@ function BlogEditorPageInner() {
   const [title, setTitle] = useState('')
   const [slug, setSlug] = useState('')
   const [slugTouched, setSlugTouched] = useState(false)
-  const [body, setBody] = useState('')
+  const [body, setBody] = useState('') // stored as HTML (API/back-compat)
   const [editorKey, setEditorKey] = useState(0)
+  const bodyApiRef = useRef<{ getHtml: () => Promise<string> } | null>(null)
   const [selectedTags, setSelectedTags] = useState<string[]>([])
   const [tagInput, setTagInput] = useState('')
   const [tagSuggestions, setTagSuggestions] = useState<string[]>([])
@@ -289,7 +291,7 @@ function BlogEditorPageInner() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!token) return
-    const html = body.trim()
+    const html = (await bodyApiRef.current?.getHtml?.())?.trim() ?? body.trim()
     if (!html || html === '<p></p>') {
       showToast('Add some body content.', 'error')
       return
@@ -368,11 +370,24 @@ function BlogEditorPageInner() {
         <div className="block text-sm">
           <span className="text-slate-600 dark:text-slate-300">Body</span>
           <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-            Rich text: headings, lists, bold, colors, highlight, links, fonts. Images stay local until you
-            save, then upload to Cloudflare.
+            Editor.js blocks. Images stay local until you save, then upload to Cloudflare.
           </p>
           <div className="mt-2">
-            <BlogRichTextEditor key={editorKey} initialHTML={body || '<p></p>'} onChange={setBody} />
+            <ErrorBoundary
+              fallback={({ error }) => (
+                <div className="rounded-lg border border-red-500/40 bg-red-500/10 p-3 text-sm text-red-200">
+                  Blog editor failed to mount. {error.message}
+                </div>
+              )}
+            >
+              <BlogBodyEditorJs
+                key={editorKey}
+                initialBody={body}
+                onReady={(api) => {
+                  bodyApiRef.current = api
+                }}
+              />
+            </ErrorBoundary>
           </div>
         </div>
 

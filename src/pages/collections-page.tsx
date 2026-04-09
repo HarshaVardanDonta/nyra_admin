@@ -103,11 +103,13 @@ export function CollectionsPage() {
   }
 
   return (
-    <div className="bg-[#0b0e14] min-w-0 px-4 pt-6 pb-28 text-slate-50 sm:px-6 lg:p-10">
+    <div className="min-w-0 bg-slate-50 px-4 pt-6 pb-28 text-slate-900 dark:bg-[#0b0e14] dark:text-slate-50 sm:px-6 lg:p-10">
       <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-white">Collections</h1>
-          <p className="mt-1 text-sm text-slate-400">
+          <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-white">
+            Collections
+          </h1>
+          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
             Manage your storefront&apos;s product groups and banners.
           </p>
         </div>
@@ -124,24 +126,36 @@ export function CollectionsPage() {
         </Link>
       </div>
 
-      <div className="mb-4 flex flex-col gap-3 rounded-xl border border-slate-800 bg-[#151b23] p-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="mb-4 flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-[#151b23] sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-wrap items-center gap-2">
-          <label className="flex items-center gap-2 rounded-lg border border-slate-700 bg-[#0f1419] px-3 py-2 text-sm text-slate-300">
-            <svg className="h-4 w-4 text-slate-500" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+          <label className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 dark:border-slate-700 dark:bg-[#0f1419] dark:text-slate-300">
+            <svg
+              className="h-4 w-4 text-slate-500"
+              fill="none"
+              viewBox="0 0 24 24"
+              strokeWidth={1.5}
+              stroke="currentColor"
+            >
               <path strokeLinecap="round" strokeLinejoin="round" d="M3 4h18M3 8h18M3 12h18M3 16h18" />
             </svg>
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value as CollectionStatusFilter)}
-              className="select-tail cursor-pointer border-none bg-transparent text-sm font-medium text-slate-200 outline-none"
+              className="select-tail cursor-pointer border-none bg-transparent text-sm font-medium text-slate-900 outline-none dark:text-slate-200"
             >
               <option value="all">All Status</option>
               <option value="published">Published</option>
               <option value="draft">Draft</option>
             </select>
           </label>
-          <label className="flex items-center gap-2 rounded-lg border border-slate-700 bg-[#0f1419] px-3 py-2 text-sm text-slate-300">
-            <svg className="h-4 w-4 text-slate-500" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+          <label className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 dark:border-slate-700 dark:bg-[#0f1419] dark:text-slate-300">
+            <svg
+              className="h-4 w-4 text-slate-500"
+              fill="none"
+              viewBox="0 0 24 24"
+              strokeWidth={1.5}
+              stroke="currentColor"
+            >
               <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
             </svg>
             <select
@@ -152,12 +166,12 @@ export function CollectionsPage() {
               <option>All Time</option>
             </select>
           </label>
-          <label className="flex items-center gap-2 rounded-lg border border-slate-700 bg-[#0f1419] px-3 py-2 text-sm text-slate-300">
+          <label className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 dark:border-slate-700 dark:bg-[#0f1419] dark:text-slate-300">
             <span className="text-xs font-semibold text-slate-500">A–Z</span>
             <select
               value={sort}
               onChange={(e) => setSort(e.target.value as CollectionSort)}
-              className="select-tail cursor-pointer border-none bg-transparent text-sm font-medium text-slate-200 outline-none"
+              className="select-tail cursor-pointer border-none bg-transparent text-sm font-medium text-slate-900 outline-none dark:text-slate-200"
             >
               <option value="name_asc">Name A–Z</option>
               <option value="name_desc">Name Z–A</option>
@@ -166,16 +180,16 @@ export function CollectionsPage() {
             </select>
           </label>
         </div>
-        <p className="text-sm text-slate-500">
+        <p className="text-sm text-slate-500 dark:text-slate-500">
           Showing {formatInt(pageInfo.from)}–{formatInt(pageInfo.to)} of {formatInt(total)} collections
         </p>
       </div>
 
-      <div className="overflow-hidden rounded-xl border border-slate-800 bg-[#151b23] shadow-xl">
+      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-[#151b23] dark:shadow-xl">
         <div className="overflow-x-auto">
           <table className="w-full min-w-[720px] text-left text-sm">
             <thead>
-              <tr className="border-b border-slate-800 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+              <tr className="border-b border-slate-200 text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:border-slate-800 dark:text-slate-500">
                 <th className="px-5 py-4">Collection image</th>
                 <th className="px-5 py-4">Collection name</th>
                 <th className="px-5 py-4">Products</th>
@@ -183,16 +197,16 @@ export function CollectionsPage() {
                 <th className="px-5 py-4 text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-800/80">
+            <tbody className="divide-y divide-slate-200 dark:divide-slate-800/80">
               {loading ? (
                 <tr>
-                  <td colSpan={5} className="px-5 py-16 text-center text-slate-500">
+                  <td colSpan={5} className="px-5 py-16 text-center text-slate-500 dark:text-slate-500">
                     Loading…
                   </td>
                 </tr>
               ) : items.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-5 py-16 text-center text-slate-500">
+                  <td colSpan={5} className="px-5 py-16 text-center text-slate-500 dark:text-slate-500">
                     No collections yet. Create one to group products on the storefront.
                   </td>
                 </tr>
@@ -202,7 +216,7 @@ export function CollectionsPage() {
                   const thumb = row.thumbnailUrl ? resolveMediaUrl(row.thumbnailUrl) : ''
                   const seg = collectionSlugSegment(row.slug)
                   return (
-                    <tr key={row.id} className="transition hover:bg-slate-800/40">
+                    <tr key={row.id} className="transition hover:bg-slate-50 dark:hover:bg-slate-800/40">
                       <td className="px-5 py-4">
                         <div
                           className={`flex h-14 w-24 items-center justify-center overflow-hidden rounded-lg ${
@@ -223,9 +237,10 @@ export function CollectionsPage() {
                         </div>
                       </td>
                       <td className="px-5 py-4">
-                        <p className="font-semibold text-white">{row.name}</p>
-                        <p className="mt-0.5 text-xs text-slate-500">
-                          slug: <span className="font-mono text-slate-400">{seg || '—'}</span>
+                        <p className="font-semibold text-slate-900 dark:text-white">{row.name}</p>
+                        <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-500">
+                          slug:{' '}
+                          <span className="font-mono text-slate-600 dark:text-slate-400">{seg || '—'}</span>
                         </p>
                       </td>
                       <td className="px-5 py-4">
@@ -233,12 +248,12 @@ export function CollectionsPage() {
                           {formatInt(row.productCount)} Products
                         </span>
                       </td>
-                      <td className="px-5 py-4 text-slate-400">{formatDate(row.createdAt)}</td>
+                      <td className="px-5 py-4 text-slate-600 dark:text-slate-400">{formatDate(row.createdAt)}</td>
                       <td className="px-5 py-4 text-right">
                         <div className="flex justify-end gap-1">
                           <Link
                             to={`/collections/${encodeURIComponent(row.id)}`}
-                            className="rounded-lg p-2 text-slate-400 transition hover:bg-slate-800 hover:text-white"
+                            className="rounded-lg p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white"
                             title="View"
                           >
                             <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
@@ -252,7 +267,7 @@ export function CollectionsPage() {
                           </Link>
                           <Link
                             to={`/collections/${encodeURIComponent(row.id)}/edit`}
-                            className="rounded-lg p-2 text-slate-400 transition hover:bg-slate-800 hover:text-white"
+                            className="rounded-lg p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white"
                             title="Edit"
                           >
                             <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
@@ -266,7 +281,7 @@ export function CollectionsPage() {
                           <button
                             type="button"
                             onClick={() => void handleDeleteRow(row.id, row.name)}
-                            className="rounded-lg p-2 text-slate-400 transition hover:bg-red-950/50 hover:text-red-400"
+                            className="rounded-lg p-2 text-slate-500 transition hover:bg-red-50 hover:text-red-600 dark:text-slate-400 dark:hover:bg-red-950/50 dark:hover:text-red-400"
                             title="Delete"
                           >
                             <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
@@ -287,7 +302,7 @@ export function CollectionsPage() {
           </table>
         </div>
 
-        <div className="flex flex-col items-center justify-between gap-3 border-t border-slate-800 px-5 py-4 text-sm text-slate-500 sm:flex-row">
+        <div className="flex flex-col items-center justify-between gap-3 border-t border-slate-200 px-5 py-4 text-sm text-slate-600 dark:border-slate-800 dark:text-slate-500 sm:flex-row">
           <p className="tabular-nums">
             Page {page} / {totalPages}
           </p>
@@ -296,7 +311,7 @@ export function CollectionsPage() {
               type="button"
               disabled={page <= 1 || loading}
               onClick={() => setPage((p) => Math.max(1, p - 1))}
-              className="inline-flex items-center gap-1 rounded-lg border border-slate-700 px-3 py-2 text-sm text-slate-300 transition hover:bg-slate-800 disabled:opacity-40"
+              className="inline-flex items-center gap-1 rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-700 transition hover:bg-slate-100 disabled:opacity-40 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
             >
               <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
@@ -307,7 +322,7 @@ export function CollectionsPage() {
               type="button"
               disabled={loading || page >= totalPages}
               onClick={() => setPage((p) => p + 1)}
-              className="inline-flex items-center gap-1 rounded-lg border border-slate-700 px-3 py-2 text-sm text-slate-300 transition hover:bg-slate-800 disabled:opacity-40"
+              className="inline-flex items-center gap-1 rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-700 transition hover:bg-slate-100 disabled:opacity-40 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
             >
               Next
               <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">

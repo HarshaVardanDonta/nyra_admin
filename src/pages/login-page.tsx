@@ -1,5 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
+import { PhoneInput, defaultCountries } from 'react-international-phone'
+import 'react-international-phone/style.css'
 import { useAuth } from '../contexts/use-auth'
 import { useTheme } from '../contexts/use-theme'
 import {
@@ -18,6 +20,8 @@ import {
   useMsg91WidgetLogin,
   useMsg91WidgetServerProxy,
 } from '../lib/msg91-widget'
+
+const INDIA_ONLY_COUNTRIES = defaultCountries.filter((c) => c[1] === 'in')
 
 function BrandMark() {
   return (
@@ -52,8 +56,9 @@ export function LoginPage() {
   const { theme, toggleTheme } = useTheme()
   const navigate = useNavigate()
   const widgetMode = useMsg91WidgetLogin()
+  const serverProxyMode = useMsg91WidgetServerProxy()
   const [widgetReady, setWidgetReady] = useState(!widgetMode)
-  const [phone, setPhone] = useState('')
+  const [phone, setPhone] = useState('+91')
   const [otp, setOtp] = useState('')
   const [requestId, setRequestId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -65,7 +70,7 @@ export function LoginPage() {
       setWidgetReady(true)
       return
     }
-    if (useMsg91WidgetServerProxy()) {
+    if (serverProxyMode) {
       setWidgetReady(true)
       return
     }
@@ -90,19 +95,19 @@ export function LoginPage() {
     return () => {
       cancelled = true
     }
-  }, [widgetMode])
+  }, [widgetMode, serverProxyMode])
 
   if (isAuthenticated) {
     return <Navigate to="/dashboard" replace />
   }
 
   const showOtpStep = Boolean(requestId)
+  const trimmedPhone = phone.trim()
 
   async function handleSendOtp(e: FormEvent) {
     e.preventDefault()
     setError(null)
-    const trimmed = phone.trim()
-    if (!trimmed) {
+    if (!trimmedPhone || trimmedPhone === '+91') {
       setError('Enter your phone number')
       return
     }
@@ -113,7 +118,7 @@ export function LoginPage() {
     setLoading(true)
     try {
       if (widgetMode) {
-        const identifier = toMsg91MobileIdentifier(trimmed)
+        const identifier = toMsg91MobileIdentifier(trimmedPhone)
         if (!identifier) {
           setError('Enter a valid Indian mobile number (10 digits or +91…)')
           return
@@ -122,7 +127,7 @@ export function LoginPage() {
         setRequestId(req)
         setOtp('')
       } else {
-        const { request_id } = await sendOtp(trimmed)
+        const { request_id } = await sendOtp(trimmedPhone)
         setRequestId(request_id)
         setOtp('')
       }
@@ -136,10 +141,13 @@ export function LoginPage() {
   async function handleVerify(e: FormEvent) {
     e.preventDefault()
     setError(null)
-    const trimmedPhone = phone.trim()
     const trimmedOtp = otp.trim()
     if (!requestId || !trimmedOtp) {
       setError('Enter the code we sent you')
+      return
+    }
+    if (!trimmedPhone) {
+      setError('Enter your phone number')
       return
     }
     setLoading(true)
@@ -223,7 +231,7 @@ export function LoginPage() {
             {widgetMode ? (
               <p className="mt-2 text-center text-xs text-slate-400 dark:text-slate-500">
                 Secured with MSG91 OTP
-                {useMsg91WidgetServerProxy() ? ' · via Nyra API' : ''}
+                {serverProxyMode ? ' · via Nyra API' : ''}
                 {!widgetReady ? ' · Initializing…' : ''}
               </p>
             ) : null}
@@ -247,15 +255,18 @@ export function LoginPage() {
                 >
                   Phone
                 </label>
-                <input
-                  id="phone"
-                  name="phone"
-                  type="tel"
-                  autoComplete="tel"
+                <PhoneInput
+                  defaultCountry="in"
+                  countries={INDIA_ONLY_COUNTRIES}
                   value={phone}
-                  onChange={(ev) => setPhone(ev.target.value)}
-                  placeholder="+919876543210"
-                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-500 focus:border-blue-600 focus:ring-4 focus:ring-blue-500/20 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-50 dark:placeholder:text-slate-400 dark:focus:border-blue-500"
+                  onChange={setPhone}
+                  inputProps={{
+                    id: 'phone',
+                    name: 'phone',
+                    autoComplete: 'tel',
+                    placeholder: '9876543210',
+                  }}
+                  className="w-full [&_.react-international-phone-country-selector-button]:rounded-lg [&_.react-international-phone-country-selector-button]:border-slate-300 [&_.react-international-phone-country-selector-button]:bg-white dark:[&_.react-international-phone-country-selector-button]:border-slate-600 dark:[&_.react-international-phone-country-selector-button]:bg-slate-900 [&_.react-international-phone-country-selector-button]:text-slate-900 dark:[&_.react-international-phone-country-selector-button]:text-slate-50 [&_.react-international-phone-input]:w-full [&_.react-international-phone-input]:rounded-lg [&_.react-international-phone-input]:border-slate-300 [&_.react-international-phone-input]:bg-white [&_.react-international-phone-input]:px-3 [&_.react-international-phone-input]:py-2.5 [&_.react-international-phone-input]:text-sm [&_.react-international-phone-input]:text-slate-900 [&_.react-international-phone-input]:outline-none [&_.react-international-phone-input]:transition [&_.react-international-phone-input]:placeholder:text-slate-500 [&_.react-international-phone-input]:focus:border-blue-600 [&_.react-international-phone-input]:focus:ring-4 [&_.react-international-phone-input]:focus:ring-blue-500/20 dark:[&_.react-international-phone-input]:border-slate-600 dark:[&_.react-international-phone-input]:bg-slate-900 dark:[&_.react-international-phone-input]:text-slate-50 dark:[&_.react-international-phone-input]:placeholder:text-slate-400 dark:[&_.react-international-phone-input]:focus:border-blue-500"
                 />
               </div>
               <button
@@ -271,7 +282,7 @@ export function LoginPage() {
               <p className="text-left text-xs text-slate-500 dark:text-slate-400">
                 Code sent to{' '}
                 <span className="text-slate-900 dark:text-slate-50">
-                  {phone.trim()}
+                  {trimmedPhone}
                 </span>
                 <button
                   type="button"
