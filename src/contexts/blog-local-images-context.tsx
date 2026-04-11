@@ -1,5 +1,11 @@
 import { createContext, useCallback, useContext, useRef, type ReactNode } from 'react'
-import { collectBlobImageSrcs, replaceBlobImagesInBlogHtml } from '../lib/blog-body-images'
+import {
+  collectBlobImageSrcs,
+  collectBlobUrlsFromEditorJsJson,
+  replaceBlobImagesInBlogHtml,
+  replaceBlobUrlsInEditorJsJson,
+} from '../lib/blog-body-images'
+import { parseEditorJsBody } from '../lib/editorjs-body'
 
 export type ResolveBlogBodyResult = {
   html: string
@@ -35,9 +41,29 @@ export function BlogLocalImagesProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
-  const resolveAndUpload = useCallback(async (html: string, token: string) => {
-    const blobUrlsUsed = collectBlobImageSrcs(html)
-    const out = await replaceBlobImagesInBlogHtml(html, token, mapRef.current)
+  const resolveAndUpload = useCallback(async (body: string, token: string) => {
+    const trimmed = body.trim()
+    if (trimmed.startsWith('{')) {
+      const parsed = parseEditorJsBody(body)
+      if (parsed?.blocks) {
+        const blobUrlsUsed = collectBlobUrlsFromEditorJsJson(body)
+        const out = await replaceBlobUrlsInEditorJsJson(body, token, mapRef.current)
+        const revokePendingBlobs = () => {
+          for (const u of blobUrlsUsed) {
+            mapRef.current.delete(u)
+            URL.revokeObjectURL(u)
+          }
+          for (const u of [...mapRef.current.keys()]) {
+            URL.revokeObjectURL(u)
+            mapRef.current.delete(u)
+          }
+        }
+        return { html: out, revokePendingBlobs }
+      }
+    }
+
+    const blobUrlsUsed = collectBlobImageSrcs(body)
+    const out = await replaceBlobImagesInBlogHtml(body, token, mapRef.current)
 
     const revokePendingBlobs = () => {
       for (const u of blobUrlsUsed) {

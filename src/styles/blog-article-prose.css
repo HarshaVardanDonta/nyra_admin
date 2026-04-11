@@ -3,29 +3,66 @@
  * Matches dark “magazine” blog layout: pale headings, check lists, green callout, figure captions.
  */
 
+/**
+ * Admin Editor.js mount — keep article prose rules off .codex-editor (they fight block UI).
+ */
+.blog-rich-editor {
+  overflow: visible;
+}
+
+.blog-editor-js-holder {
+  position: relative;
+  overflow: visible;
+}
+
+/* Published / preview prose: no slab background — matches page (light or dark). */
 .blog-article-prose {
-  --blog-bg: #050505;
-  --blog-surface: #0a0a0a;
-  --blog-text: #d4d4d8;
-  --blog-muted: #a1a1aa;
-  --blog-heading: #bae6fd;
-  --blog-heading-strong: #f0f9ff;
-  --blog-h3: #e0f2fe;
-  --blog-link: #7dd3fc;
-  --blog-link-hover: #bae6fd;
+  --blog-text: #0f172a;
+  --blog-muted: #64748b;
+  --blog-heading-strong: #0f172a;
+  --blog-heading: #0369a1;
+  --blog-h3: #0f766e;
+  --blog-link: #2563eb;
+  --blog-link-hover: #1d4ed8;
+  --blog-strong: #0f172a;
+  --blog-code-bg: #f1f5f9;
+  --blog-code-fg: #0f172a;
+  --blog-pre-bg: #f1f5f9;
+  --blog-hr: #e2e8f0;
+  --blog-bq-border: #cbd5e1;
+  --blog-figure-frame-bg: #e2e8f0;
   --blog-callout-bg: #14532d;
   --blog-callout-border: #166534;
-  --blog-callout-text: #bbf7d0;
-  --blog-caption-bg: #cbd5e1;
+  --blog-callout-text: #ecfdf5;
+  --blog-caption-bg: #e2e8f0;
   --blog-caption-text: #0f172a;
   --blog-check: #22c55e;
   --blog-check-inner: #052e16;
 
-  background: var(--blog-surface);
+  background: transparent;
   color: var(--blog-text);
   font-family: Inter, ui-sans-serif, system-ui, sans-serif;
   line-height: 1.75;
   font-size: 1rem;
+}
+
+html[data-theme='dark'] .blog-article-prose {
+  --blog-text: #e2e8f0;
+  --blog-muted: #94a3b8;
+  --blog-heading-strong: #f8fafc;
+  --blog-heading: #7dd3fc;
+  --blog-h3: #bae6fd;
+  --blog-link: #7dd3fc;
+  --blog-link-hover: #bae6fd;
+  --blog-strong: #f4f4f5;
+  --blog-code-bg: #27272a;
+  --blog-code-fg: #e4e4e7;
+  --blog-pre-bg: #27272a;
+  --blog-hr: #3f3f46;
+  --blog-bq-border: #52525b;
+  --blog-figure-frame-bg: #18181b;
+  --blog-caption-bg: #cbd5e1;
+  --blog-caption-text: #0f172a;
 }
 
 .blog-article-prose .ProseMirror {
@@ -72,7 +109,7 @@
 }
 
 .blog-article-prose strong {
-  color: #f4f4f5;
+  color: var(--blog-strong);
   font-weight: 600;
 }
 
@@ -119,7 +156,7 @@
 .blog-article-prose blockquote {
   margin: 1.25rem 0;
   padding: 0.65rem 0 0.65rem 1rem;
-  border-left: 3px solid #52525b;
+  border-left: 3px solid var(--blog-bq-border);
   color: var(--blog-muted);
   font-style: italic;
 }
@@ -152,7 +189,7 @@
   border-radius: 14px 14px 0 0;
   overflow: hidden;
   line-height: 0;
-  background: #18181b;
+  background: var(--blog-figure-frame-bg);
 }
 .blog-article-prose .blog-figure-img {
   display: block;
@@ -227,14 +264,16 @@
   font-size: 0.9em;
   padding: 0.1em 0.35em;
   border-radius: 0.25rem;
-  background: #18181b;
+  background: var(--blog-code-bg);
+  color: var(--blog-code-fg);
 }
 
 .blog-article-prose pre {
   margin: 1rem 0;
   padding: 0.85rem 1rem;
   border-radius: 0.5rem;
-  background: #18181b;
+  background: var(--blog-pre-bg);
+  color: var(--blog-code-fg);
   overflow-x: auto;
 }
 .blog-article-prose pre code {
@@ -245,6 +284,6 @@
 /* Horizontal rule */
 .blog-article-prose hr {
   border: 0;
-  border-top: 1px solid #27272a;
+  border-top: 1px solid var(--blog-hr);
   margin: 2rem 0;
 }

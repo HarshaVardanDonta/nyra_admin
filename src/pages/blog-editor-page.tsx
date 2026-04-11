@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { BlogRichTextEditor } from '../components/blog-rich-text-editor'
+import { BlogEditorJs } from '../components/blog-editor-js'
 import { BlogLocalImagesProvider, useBlogLocalImages } from '../contexts/blog-local-images-context'
 import { useAuth } from '../contexts/use-auth'
 import { useToast } from '../contexts/use-toast'
@@ -13,6 +13,29 @@ import {
   updateBlog,
   type BlogWriteInput,
 } from '../lib/api/blogs'
+import {
+  emptyEditorOutput,
+  hasEditorJsMeaningfulContent,
+  isLegacyHtmlBody,
+  parseEditorJsBody,
+} from '../lib/editorjs-body'
+
+function LegacyHtmlBlogEditor({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  return (
+    <div className="space-y-2">
+      <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-950 dark:border-amber-800/80 dark:bg-amber-950/40 dark:text-amber-100">
+        This post uses legacy HTML. Edit the source below, or recreate the article as a new post using the block
+        editor.
+      </p>
+      <textarea
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        spellCheck={false}
+        className="min-h-[min(60vh,560px)] w-full rounded-lg border border-slate-200 bg-white p-3 font-mono text-sm text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+      />
+    </div>
+  )
+}
 
 function slugifyHint(title: string): string {
   return title
@@ -72,16 +95,28 @@ function BlogEditorPageInner() {
   const [isPublished, setIsPublished] = useState(false)
   const [loading, setLoading] = useState(!isNew)
   const [saving, setSaving] = useState(false)
+  /** Snapshot of `body` from the server (or cleared for “new”); not updated on every keystroke — drives Editor.js initial props with `editorKey`. */
+  const [editorSeedBody, setEditorSeedBody] = useState('')
+  const loadGenerationRef = useRef(0)
+
+  const editorInitialData = useMemo(() => {
+    const p = parseEditorJsBody(editorSeedBody)
+    if (p) return p
+    return emptyEditorOutput()
+  }, [editorKey, editorSeedBody])
 
   const load = useCallback(async () => {
     if (!token || isNew || !blogId) return
+    const gen = ++loadGenerationRef.current
     setLoading(true)
     try {
       const b = await fetchBlogDetail(token, blogId)
+      if (gen !== loadGenerationRef.current) return
       setTitle(b.title)
       setSlug(b.slug)
       setSlugTouched(true)
       setBody(b.body)
+      setEditorSeedBody(b.body)
       setEditorKey((k) => k + 1)
       setSelectedTags(b.tags.map((t) => t.trim().toLowerCase()).filter(Boolean))
       setIsPublished(b.isPublished)
@@ -106,6 +141,12 @@ function BlogEditorPageInner() {
       setLoading(false)
     }
   }, [token, blogId, isNew, showApiError])
+
+  useEffect(() => {
+    if (isNew) {
+      setEditorSeedBody('')
+    }
+  }, [isNew])
 
   useEffect(() => {
     void load()
@@ -289,14 +330,19 @@ function BlogEditorPageInner() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!token) return
-    const html = body.trim()
-    if (!html || html === '<p></p>') {
+    const trimmed = body.trim()
+    if (isLegacyHtmlBody(body)) {
+      if (!trimmed || trimmed === '<p></p>') {
+        showToast('Add some body content.', 'error')
+        return
+      }
+    } else if (!hasEditorJsMeaningfulContent(body)) {
       showToast('Add some body content.', 'error')
       return
     }
     setSaving(true)
     try {
-      const { html: resolvedBody, revokePendingBlobs } = await resolveAndUpload(html, token)
+      const { html: resolvedBody, revokePendingBlobs } = await resolveAndUpload(body, token)
       const input: BlogWriteInput = {
         ...buildInput(),
         body: resolvedBody,
@@ -368,11 +414,20 @@ function BlogEditorPageInner() {
         <div className="block text-sm">
           <span className="text-slate-600 dark:text-slate-300">Body</span>
           <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-            Rich text: headings, lists, bold, colors, highlight, links, fonts. Images stay local until you
-            save, then upload to Cloudflare.
+            Block editor (Editor.js): headings, lists, callouts, figures with captions, links, and highlights.
+            Images stay local until you save, then upload to Cloudflare.
           </p>
           <div className="mt-2">
-            <BlogRichTextEditor key={editorKey} initialHTML={body || '<p></p>'} onChange={setBody} />
+            {isLegacyHtmlBody(body) ? (
+              <LegacyHtmlBlogEditor value={body} onChange={setBody} />
+            ) : (
+              <BlogEditorJs
+                key={editorKey}
+                initialData={editorInitialData}
+                onChange={setBody}
+                placeholder="Write your article…"
+              />
+            )}
           </div>
         </div>
 
