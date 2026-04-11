@@ -1,7 +1,14 @@
 import { fetchCatalogProductByKey, type CatalogProductRow } from './catalog'
 import { request } from './client'
 
-export type ProductVariantInput = { name: string; values: string[] }
+export type ProductVariantInput = {
+  name: string
+  values: string[]
+  /** Quick-add default; must be one of values when set */
+  defaultValue?: string
+  /** INR delta per value key (exact string as in values) */
+  valuePriceAdjustments?: Record<string, number>
+}
 
 export type ProductSeoInput = {
   slug: string
@@ -83,13 +90,49 @@ function coerceVariantValuesForPatch(raw: unknown): string[] {
   return []
 }
 
-function variantsForProductPatch(row: CatalogProductRow): { name: string; values: string[] }[] {
+function coerceValuePriceAdjustmentsForPatch(
+  raw: unknown,
+): Record<string, number> | undefined {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return undefined
+  const o = raw as Record<string, unknown>
+  const out: Record<string, number> = {}
+  for (const [k, v] of Object.entries(o)) {
+    if (typeof v === 'number' && Number.isFinite(v)) out[k] = v
+  }
+  return Object.keys(out).length ? out : undefined
+}
+
+function variantsForProductPatch(
+  row: CatalogProductRow,
+): { name: string; values: string[]; defaultValue?: string; valuePriceAdjustments?: Record<string, number> }[] {
   if (!Array.isArray(row.variants)) return []
   return row.variants
-    .map((v) => ({
-      name: typeof v?.name === 'string' ? v.name : '',
-      values: coerceVariantValuesForPatch((v as { values?: unknown }).values),
-    }))
+    .map((v) => {
+      const values = coerceVariantValuesForPatch((v as { values?: unknown }).values)
+      const dvRaw = (v as { defaultValue?: unknown }).defaultValue
+      const dv = typeof dvRaw === 'string' ? dvRaw.trim() : ''
+      const name = typeof v?.name === 'string' ? v.name : ''
+      const adj = coerceValuePriceAdjustmentsForPatch(
+        (v as { valuePriceAdjustments?: unknown }).valuePriceAdjustments,
+      )
+      const out: {
+        name: string
+        values: string[]
+        defaultValue?: string
+        valuePriceAdjustments?: Record<string, number>
+      } = { name, values }
+      if (dv && values.includes(dv)) out.defaultValue = dv
+      if (adj) {
+        const filtered: Record<string, number> = {}
+        for (const val of values) {
+          if (typeof adj[val] === 'number' && Number.isFinite(adj[val])) {
+            filtered[val] = adj[val]
+          }
+        }
+        if (Object.keys(filtered).length) out.valuePriceAdjustments = filtered
+      }
+      return out
+    })
     .filter((x) => x.name && x.values.length > 0)
 }
 

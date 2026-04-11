@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useState } from 'react'
+import { useCallback, useEffect, useId, useMemo, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { useAuth } from '../contexts/use-auth'
 import { useToast } from '../contexts/use-toast'
@@ -21,6 +21,15 @@ import {
   type ProductVariantInput,
 } from '../lib/api/products'
 import { resolveMediaUrl } from '../lib/media-url'
+import {
+  APPLICATION_GUIDE_COLUMN_LABELS,
+  emptyApplicationGuideRow,
+  emptyProductDescriptionV1,
+  parseProductDescription,
+  serializeProductDescriptionV1,
+  type ApplicationGuideRow,
+  type ProductDescriptionV1,
+} from '../lib/productDescription'
 import { AdminDateField, AdminDateTimeField } from '../components/admin-date-field'
 
 function slugify(s: string) {
@@ -82,7 +91,18 @@ function Toggle({
 }
 
 function emptyVariant(): ProductVariantInput {
-  return { name: '', values: [] }
+  return { name: '', values: [], defaultValue: '', valuePriceAdjustments: {} }
+}
+
+function sanitizeValuePriceAdjustments(
+  m: Record<string, number> | undefined,
+): Record<string, number> {
+  if (!m || typeof m !== 'object') return {}
+  const out: Record<string, number> = {}
+  for (const [k, n] of Object.entries(m)) {
+    if (typeof n === 'number' && Number.isFinite(n)) out[k] = n
+  }
+  return out
 }
 
 /** Catalog/API may send values as a non-array (e.g. map, null, or { value: "x" }[]). */
@@ -116,11 +136,63 @@ function asVariantValueArray(v: unknown): string[] {
   return Array.isArray(v) && v.every((x) => typeof x === 'string') ? v : coerceVariantValues(v)
 }
 
+/** Minimum total Δ ₹ across all variant value combinations (for price floor checks). */
+function minAdjustmentSumAcrossCombinations(rows: ProductVariantInput[]): number {
+  if (rows.length === 0) return 0
+  let minSum = Infinity
+  function walk(i: number, acc: number) {
+    if (i === rows.length) {
+      minSum = Math.min(minSum, acc)
+      return
+    }
+    const vals = coerceVariantValues(rows[i].values)
+      .map((x) => x.trim())
+      .filter(Boolean)
+    const adjMap = rows[i].valuePriceAdjustments ?? {}
+    for (const val of vals) {
+      const n = adjMap[val]
+      const delta = typeof n === 'number' && Number.isFinite(n) ? n : 0
+      walk(i + 1, acc + delta)
+    }
+  }
+  walk(0, 0)
+  return minSum === Infinity ? 0 : minSum
+}
+
+function variantPriceAdjustmentErrorMessage(
+  baseRupees: number,
+  discountRupees: number,
+  variantPayload: ProductVariantInput[],
+): string | null {
+  if (variantPayload.length === 0) return null
+  const minSum = minAdjustmentSumAcrossCombinations(variantPayload)
+  if (baseRupees + minSum < 0) {
+    return 'Variant Δ ₹ would make the base price negative for some combinations. Reduce negative deltas or increase the base price.'
+  }
+  if (discountRupees + minSum < 0) {
+    return 'Variant Δ ₹ would make the sale price negative for some combinations. Reduce negative deltas or increase the discount price.'
+  }
+  return null
+}
+
+const APPLICATION_GUIDE_KEYS: (keyof ApplicationGuideRow)[] = [
+  'targetContext',
+  'dosageDensity',
+  'applicationMethod',
+  'interval',
+  'technicalSpecs',
+]
+
 function mapProductToForm(p: CatalogProductRow) {
   const variants: ProductVariantInput[] = Array.isArray(p.variants)
     ? p.variants.map((v) => ({
         name: typeof v?.name === 'string' ? v.name : '',
         values: coerceVariantValues(v?.values),
+        defaultValue:
+          typeof v?.defaultValue === 'string' ? v.defaultValue : '',
+        valuePriceAdjustments: sanitizeValuePriceAdjustments(
+          v?.valuePriceAdjustments,
+        ),
       }))
     : []
   return {
@@ -163,7 +235,7 @@ export function ProductEditorPage() {
   const [saving, setSaving] = useState(false)
 
   const [name, setName] = useState('')
-  const [description, setDescription] = useState('')
+  const [descDoc, setDescDoc] = useState<ProductDescriptionV1>(() => emptyProductDescriptionV1())
   const [brandId, setBrandId] = useState('')
   const [categoryId, setCategoryId] = useState('')
   const [basePriceRupees, setBasePriceRupees] = useState('0')
@@ -175,8 +247,18 @@ export function ProductEditorPage() {
   const [isOutOfStock, setIsOutOfStock] = useState(false)
   const [variantsEnabled, setVariantsEnabled] = useState(true)
   const [variants, setVariants] = useState<ProductVariantInput[]>([
-    { name: 'size', values: ['Small', 'Medium', 'Large'] },
-    { name: 'color', values: ['Midnight Black', 'Arctic White'] },
+    {
+      name: 'size',
+      values: ['Small', 'Medium', 'Large'],
+      defaultValue: '',
+      valuePriceAdjustments: {},
+    },
+    {
+      name: 'color',
+      values: ['Midnight Black', 'Arctic White'],
+      defaultValue: '',
+      valuePriceAdjustments: {},
+    },
   ])
   const [slug, setSlug] = useState('')
   const [metaTitle, setMetaTitle] = useState('')
@@ -209,7 +291,17 @@ export function ProductEditorPage() {
         if (cancelled) return
         const f = mapProductToForm(p)
         setName(dupId ? `${f.name} (copy)` : f.name)
-        setDescription(f.description)
+        {
+          const parsed = parseProductDescription(f.description)
+          if (parsed.kind === 'plain') {
+            setDescDoc({
+              ...emptyProductDescriptionV1(),
+              detailedDescription: parsed.text,
+            })
+          } else {
+            setDescDoc(parsed.doc)
+          }
+        }
         setBrandId(f.brandId)
         setCategoryId(f.categoryId)
         setBasePriceRupees(f.basePriceRupees || '0')
@@ -255,6 +347,12 @@ export function ProductEditorPage() {
     setVariants((v) => v.map((row, j) => (j === i ? { ...row, name: nameVal } : row)))
   }
 
+  function setVariantDefaultValue(i: number, defaultVal: string) {
+    setVariants((v) =>
+      v.map((row, j) => (j === i ? { ...row, defaultValue: defaultVal } : row)),
+    )
+  }
+
   function addVariantValue(i: number, val: string) {
     const t = val.trim()
     if (!t) return
@@ -267,22 +365,69 @@ export function ProductEditorPage() {
 
   function removeVariantValue(i: number, vi: number) {
     setVariants((v) =>
-      v.map((row, j) =>
-        j === i
-          ? { ...row, values: asVariantValueArray(row.values).filter((_, k) => k !== vi) }
-          : row,
-      ),
+      v.map((row, j) => {
+        if (j !== i) return row
+        const vals = asVariantValueArray(row.values)
+        const removed = vals[vi]
+        const nextVals = vals.filter((_, k) => k !== vi)
+        let nextDefault = row.defaultValue ?? ''
+        if (nextDefault === removed) nextDefault = ''
+        const adj = { ...(row.valuePriceAdjustments ?? {}) }
+        delete adj[removed]
+        return {
+          ...row,
+          values: nextVals,
+          defaultValue: nextDefault,
+          valuePriceAdjustments: adj,
+        }
+      }),
+    )
+  }
+
+  function setVariantValuePrice(
+    i: number,
+    valueStr: string,
+    raw: string,
+  ) {
+    const t = raw.trim()
+    const n = t === '' || t === '-' ? null : Number.parseFloat(t)
+    setVariants((v) =>
+      v.map((row, j) => {
+        if (j !== i) return row
+        const adj = { ...(row.valuePriceAdjustments ?? {}) }
+        if (n === null || !Number.isFinite(n) || n === 0) {
+          delete adj[valueStr]
+        } else {
+          adj[valueStr] = Math.round(n)
+        }
+        return { ...row, valuePriceAdjustments: adj }
+      }),
     )
   }
 
   function buildVariantsPayload(): ProductVariantInput[] {
     if (!variantsEnabled) return []
     return variants
-      .map((v) => ({
-        name: v.name.trim().toLowerCase(),
-        values: coerceVariantValues(v.values),
-      }))
-      .map((v) => ({ ...v, values: v.values.map((x) => x.trim()).filter(Boolean) }))
+      .map((v) => {
+        const values = coerceVariantValues(v.values)
+          .map((x) => x.trim())
+          .filter(Boolean)
+        const name = v.name.trim().toLowerCase()
+        let dv = (v.defaultValue ?? '').trim()
+        if (dv && !values.includes(dv)) dv = ''
+        const row: ProductVariantInput = { name, values }
+        if (dv) row.defaultValue = dv
+        const srcAdj = v.valuePriceAdjustments ?? {}
+        const adj: Record<string, number> = {}
+        for (const val of values) {
+          const n = srcAdj[val]
+          if (typeof n === 'number' && Number.isFinite(n) && n !== 0) {
+            adj[val] = Math.round(n)
+          }
+        }
+        if (Object.keys(adj).length) row.valuePriceAdjustments = adj
+        return row
+      })
       .filter((v) => v.name && v.values.length > 0)
   }
 
@@ -319,7 +464,7 @@ export function ProductEditorPage() {
   function buildProductFormData(published: boolean): FormData {
     const fd = new FormData()
     fd.set('name', name.trim())
-    fd.set('description', description.trim())
+    fd.set('description', serializeProductDescriptionV1(descDoc))
     fd.set('brandId', brandId)
     fd.set('categoryId', categoryId)
     fd.set('basePrice', String(parseInrInputToRupees(basePriceRupees)))
@@ -344,6 +489,15 @@ export function ProductEditorPage() {
     return fd
   }
 
+  const variantPriceError = useMemo(() => {
+    if (!variantsEnabled) return null
+    const payload = buildVariantsPayload()
+    if (payload.length === 0) return null
+    const baseRupees = parseInrInputToRupees(basePriceRupees)
+    const discountRupees = parseInrInputToRupees(discountPriceRupees)
+    return variantPriceAdjustmentErrorMessage(baseRupees, discountRupees, payload)
+  }, [variantsEnabled, variants, basePriceRupees, discountPriceRupees])
+
   async function handleSubmit(mode: 'draft' | 'publish') {
     if (!token) {
       showToast('Sign in again to continue.', 'error')
@@ -355,6 +509,10 @@ export function ProductEditorPage() {
     }
     if (!brandId || !categoryId) {
       showToast('Select a brand and category.', 'error')
+      return
+    }
+    if (variantPriceError) {
+      showToast(variantPriceError, 'error')
       return
     }
 
@@ -379,8 +537,10 @@ export function ProductEditorPage() {
     }
   }
 
-  const ready =
-    Boolean(name.trim() && brandId && categoryId && sku.trim() && buildSeo().slug)
+  const baseReady = Boolean(
+    name.trim() && brandId && categoryId && sku.trim() && buildSeo().slug,
+  )
+  const ready = baseReady && !variantPriceError
 
   if (loading) {
     return (
@@ -425,23 +585,254 @@ export function ProductEditorPage() {
                   className="mt-1 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/25 dark:border-slate-700 dark:bg-slate-900/80"
                 />
               </div>
-              <div>
-                <label className="text-xs font-medium text-slate-500 dark:text-slate-400">
-                  Description
-                </label>
-                <div className="mt-1 overflow-hidden rounded-lg border border-slate-200 dark:border-slate-700">
-                  <div className="flex gap-1 border-b border-slate-200 bg-slate-50 px-2 py-1.5 dark:border-slate-700 dark:bg-slate-900/80">
-                    <span className="rounded px-2 py-0.5 text-xs text-slate-500 dark:text-slate-400">
-                      Bold · Italic · List · Link
-                    </span>
-                  </div>
+              <div className="space-y-6">
+                <div>
+                  <label className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                    Product description
+                  </label>
+                  <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+                    Structured sections are saved as JSON in the description field for the storefront.
+                  </p>
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                    Detailed description
+                  </label>
                   <textarea
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                    placeholder="Write a detailed product description…"
+                    value={descDoc.detailedDescription}
+                    onChange={(e) =>
+                      setDescDoc((d) => ({ ...d, detailedDescription: e.target.value }))
+                    }
+                    placeholder="Write the main product copy…"
                     rows={6}
-                    className="w-full resize-y border-0 bg-white px-3 py-2 text-sm outline-none dark:bg-[#0f1419]"
+                    className="mt-1 w-full resize-y rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/25 dark:border-slate-700 dark:bg-[#0f1419]"
                   />
+                </div>
+                <div>
+                  <div className="flex items-center justify-between gap-2">
+                    <label className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                      Application guide
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setDescDoc((d) => ({
+                          ...d,
+                          applicationGuide: {
+                            rows: [...d.applicationGuide.rows, emptyApplicationGuideRow()],
+                          },
+                        }))
+                      }
+                      className="text-xs font-medium text-blue-600 hover:text-blue-500 dark:text-blue-400"
+                    >
+                      + Add row
+                    </button>
+                  </div>
+                  <div className="mt-2 overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-700">
+                    <table className="w-full min-w-[720px] border-collapse text-xs">
+                      <thead>
+                        <tr className="border-b border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-900/80">
+                          {APPLICATION_GUIDE_COLUMN_LABELS.map((h) => (
+                            <th
+                              key={h}
+                              className="px-2 py-2 text-left font-semibold text-slate-700 dark:text-slate-200"
+                            >
+                              {h}
+                            </th>
+                          ))}
+                          <th className="w-10 px-1 py-2" />
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {descDoc.applicationGuide.rows.length === 0 ? (
+                          <tr>
+                            <td
+                              colSpan={6}
+                              className="px-3 py-4 text-center text-slate-500 dark:text-slate-400"
+                            >
+                              No rows yet. Use “Add row”.
+                            </td>
+                          </tr>
+                        ) : (
+                          descDoc.applicationGuide.rows.map((row, ri) => (
+                            <tr
+                              key={ri}
+                              className="border-b border-slate-100 dark:border-slate-800"
+                            >
+                              {APPLICATION_GUIDE_KEYS.map((key) => (
+                                <td key={key} className="p-1 align-top">
+                                  <input
+                                    value={row[key]}
+                                    onChange={(e) =>
+                                      setDescDoc((d) => {
+                                        const rows = [...d.applicationGuide.rows]
+                                        rows[ri] = { ...rows[ri], [key]: e.target.value }
+                                        return { ...d, applicationGuide: { rows } }
+                                      })
+                                    }
+                                    className="w-full min-w-[100px] rounded border border-slate-200 bg-white px-2 py-1.5 dark:border-slate-700 dark:bg-slate-900"
+                                  />
+                                </td>
+                              ))}
+                              <td className="p-1 align-top">
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setDescDoc((d) => ({
+                                      ...d,
+                                      applicationGuide: {
+                                        rows: d.applicationGuide.rows.filter((_, j) => j !== ri),
+                                      },
+                                    }))
+                                  }
+                                  className="text-xs font-medium text-red-600 dark:text-red-400"
+                                >
+                                  Remove
+                                </button>
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+                <div>
+                  <div className="flex items-center justify-between gap-2">
+                    <label className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                      How to grow
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setDescDoc((d) => ({
+                          ...d,
+                          howToGrow: [...d.howToGrow, { title: '', detail: '' }],
+                        }))
+                      }
+                      className="text-xs font-medium text-blue-600 hover:text-blue-500 dark:text-blue-400"
+                    >
+                      + Add step
+                    </button>
+                  </div>
+                  <div className="mt-2 space-y-3">
+                    {descDoc.howToGrow.map((step, si) => (
+                      <div
+                        key={si}
+                        className="rounded-lg border border-slate-100 bg-slate-50/80 p-3 dark:border-slate-800 dark:bg-slate-900/40"
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                            Step {si + 1}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setDescDoc((d) => ({
+                                ...d,
+                                howToGrow: d.howToGrow.filter((_, j) => j !== si),
+                              }))
+                            }
+                            className="shrink-0 text-xs font-medium text-red-600 dark:text-red-400"
+                          >
+                            Remove
+                          </button>
+                        </div>
+                        <input
+                          value={step.title}
+                          onChange={(e) =>
+                            setDescDoc((d) => {
+                              const howToGrow = [...d.howToGrow]
+                              howToGrow[si] = { ...howToGrow[si], title: e.target.value }
+                              return { ...d, howToGrow }
+                            })
+                          }
+                          placeholder="Step title"
+                          className="mt-2 w-full rounded border border-slate-200 bg-white px-2 py-1.5 text-sm dark:border-slate-700 dark:bg-slate-900"
+                        />
+                        <textarea
+                          value={step.detail}
+                          onChange={(e) =>
+                            setDescDoc((d) => {
+                              const howToGrow = [...d.howToGrow]
+                              howToGrow[si] = { ...howToGrow[si], detail: e.target.value }
+                              return { ...d, howToGrow }
+                            })
+                          }
+                          placeholder="Details"
+                          rows={2}
+                          className="mt-2 w-full resize-y rounded border border-slate-200 bg-white px-2 py-1.5 text-sm dark:border-slate-700 dark:bg-slate-900"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <div className="flex items-center justify-between gap-2">
+                    <label className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                      Technical specifications
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setDescDoc((d) => ({
+                          ...d,
+                          technicalSpecs: [...d.technicalSpecs, { label: '', value: '' }],
+                        }))
+                      }
+                      className="text-xs font-medium text-blue-600 hover:text-blue-500 dark:text-blue-400"
+                    >
+                      + Add field
+                    </button>
+                  </div>
+                  <div className="mt-2 space-y-2">
+                    {descDoc.technicalSpecs.map((spec, ti) => (
+                      <div key={ti} className="flex flex-wrap items-center gap-2">
+                        <input
+                          value={spec.label}
+                          onChange={(e) =>
+                            setDescDoc((d) => {
+                              const technicalSpecs = [...d.technicalSpecs]
+                              technicalSpecs[ti] = {
+                                ...technicalSpecs[ti],
+                                label: e.target.value,
+                              }
+                              return { ...d, technicalSpecs }
+                            })
+                          }
+                          placeholder="Label"
+                          className="min-w-[120px] flex-1 rounded border border-slate-200 bg-white px-2 py-1.5 text-sm dark:border-slate-700 dark:bg-slate-900"
+                        />
+                        <input
+                          value={spec.value}
+                          onChange={(e) =>
+                            setDescDoc((d) => {
+                              const technicalSpecs = [...d.technicalSpecs]
+                              technicalSpecs[ti] = {
+                                ...technicalSpecs[ti],
+                                value: e.target.value,
+                              }
+                              return { ...d, technicalSpecs }
+                            })
+                          }
+                          placeholder="Value"
+                          className="min-w-[120px] flex-1 rounded border border-slate-200 bg-white px-2 py-1.5 text-sm dark:border-slate-700 dark:bg-slate-900"
+                        />
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setDescDoc((d) => ({
+                              ...d,
+                              technicalSpecs: d.technicalSpecs.filter((_, j) => j !== ti),
+                            }))
+                          }
+                          className="text-xs font-medium text-red-600 dark:text-red-400"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
               <div className="grid gap-3 sm:grid-cols-2">
@@ -576,6 +967,14 @@ export function ProductEditorPage() {
                 />
               </div>
             </div>
+            {variantPriceError ? (
+              <div
+                role="alert"
+                className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800 dark:border-red-900/50 dark:bg-red-950/40 dark:text-red-200"
+              >
+                {variantPriceError}
+              </div>
+            ) : null}
             {variantsEnabled ? (
               <div className="mt-4 space-y-5">
                 {variants.map((opt, i) => (
@@ -598,27 +997,72 @@ export function ProductEditorPage() {
                         Remove
                       </button>
                     </div>
-                    <div className="mt-2 flex flex-wrap gap-1.5">
-                      {asVariantValueArray(opt.values).map((val, vi) => (
-                        <span
-                          key={vi}
-                          className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2 py-0.5 text-xs dark:border-slate-700 dark:bg-slate-800"
-                        >
-                          {val}
-                          <button
-                            type="button"
-                            className="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
-                            onClick={() => removeVariantValue(i, vi)}
-                            aria-label="Remove value"
+                    <div className="mt-2 space-y-2">
+                      {asVariantValueArray(opt.values).map((val, vi) => {
+                        const delta = opt.valuePriceAdjustments?.[val]
+                        return (
+                          <div
+                            key={`${val}-${vi}`}
+                            className="flex flex-wrap items-center gap-2 rounded-lg border border-slate-200 bg-white px-2 py-1.5 dark:border-slate-700 dark:bg-slate-800/80"
                           >
-                            ×
-                          </button>
-                        </span>
-                      ))}
+                            <span className="min-w-0 flex-1 text-xs font-medium text-slate-800 dark:text-slate-100">
+                              {val}
+                            </span>
+                            <label className="flex items-center gap-1 text-[10px] font-medium text-slate-500 dark:text-slate-400">
+                              Δ ₹
+                              <input
+                                type="number"
+                                step={1}
+                                placeholder="0"
+                                value={
+                                  delta === undefined || delta === 0
+                                    ? ''
+                                    : String(delta)
+                                }
+                                onChange={(e) =>
+                                  setVariantValuePrice(i, val, e.target.value)
+                                }
+                                className="w-20 rounded border border-slate-200 bg-white px-1.5 py-0.5 text-xs tabular-nums dark:border-slate-600 dark:bg-slate-900"
+                              />
+                            </label>
+                            <button
+                              type="button"
+                              className="shrink-0 text-slate-400 hover:text-red-600 dark:hover:text-red-400"
+                              onClick={() => removeVariantValue(i, vi)}
+                              aria-label="Remove value"
+                            >
+                              ×
+                            </button>
+                          </div>
+                        )
+                      })}
                       <VariantValueAdd
                         onAdd={(v) => addVariantValue(i, v)}
                       />
                     </div>
+                    {asVariantValueArray(opt.values).length > 0 ? (
+                      <div className="mt-3">
+                        <label
+                          htmlFor={`${baseId}-var-def-${i}`}
+                          className="text-xs font-medium text-slate-500 dark:text-slate-400"
+                        >
+                          Default for quick add (storefront)
+                        </label>
+                        <select
+                          id={`${baseId}-var-def-${i}`}
+                          value={opt.defaultValue ?? ''}
+                          onChange={(e) => setVariantDefaultValue(i, e.target.value)}
+                          className="mt-1 w-full max-w-xs rounded border border-slate-200 bg-white px-2 py-1.5 text-xs dark:border-slate-700 dark:bg-slate-900"
+                        >
+                          <option value="">First value in list</option>
+                          {asVariantValueArray(opt.values).map((val) => (
+                            <option key={val} value={val}>
+                              {val}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    ) : null}
                   </div>
                 ))}
                 <button
@@ -768,16 +1212,26 @@ export function ProductEditorPage() {
               className={`mt-4 rounded-lg border p-3 ${
                 ready
                   ? 'border-emerald-500/40 bg-emerald-500/10'
-                  : 'border-amber-500/40 bg-amber-500/10'
+                  : variantPriceError && baseReady
+                    ? 'border-red-500/40 bg-red-500/10'
+                    : 'border-amber-500/40 bg-amber-500/10'
               }`}
             >
               <p className="text-sm font-medium text-slate-900 dark:text-slate-100">
-                {ready ? 'Ready to publish' : 'Missing required fields'}
+                {ready
+                  ? 'Ready to publish'
+                  : !baseReady
+                    ? 'Missing required fields'
+                    : variantPriceError ?? 'Cannot save'}
               </p>
               <p className="text-xs text-slate-600 dark:text-slate-400">
                 {ready
                   ? 'All mandatory fields are filled.'
-                  : 'Name, brand, category, SKU, and slug are required.'}
+                  : !baseReady
+                    ? 'Name, brand, category, SKU, and slug are required.'
+                    : variantPriceError
+                      ? 'Adjust base or discount price, or reduce negative Δ ₹ on variants, so the lowest combination is not below zero.'
+                      : ''}
               </p>
             </div>
             <div className="mt-3 space-y-1 text-sm">
@@ -822,7 +1276,7 @@ export function ProductEditorPage() {
             {!isEdit ? (
               <button
                 type="button"
-                disabled={saving}
+                disabled={saving || !!variantPriceError}
                 onClick={() => void handleSubmit('draft')}
                 className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-800 transition hover:bg-slate-50 disabled:opacity-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
               >

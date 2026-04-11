@@ -1,3 +1,4 @@
+import { compressImageForUpload } from '../compress-image'
 import { ApiError } from './errors'
 import { request } from './client'
 
@@ -302,8 +303,9 @@ export async function deleteBlog(token: string | null, blogId: string): Promise<
 /** Distinct tag names for blog editor autocomplete (admin). */
 /** Upload a blog body image to Cloudflare R2 (admin); returns public URL. */
 export async function uploadBlogBodyImage(token: string, file: File): Promise<string> {
+  const ready = await compressImageForUpload(file)
   const fd = new FormData()
-  fd.append('file', file)
+  fd.append('file', ready)
   const raw = await request<unknown>('/api/v1/blogs/upload-image', {
     method: 'POST',
     token,

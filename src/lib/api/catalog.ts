@@ -105,14 +105,25 @@ export function normalizeCatalogProductRow(raw: unknown): CatalogProductRow {
   const variantsRaw = o.variants
   if (Array.isArray(variantsRaw)) {
     variants = variantsRaw.map((item) => {
-      if (!item || typeof item !== 'object') return { name: '', values: [] as string[] }
+      if (!item || typeof item !== 'object')
+        return { name: '', values: [] as string[], defaultValue: '' }
       const vr = item as Record<string, unknown>
       const vn = pickStr(vr, 'name', 'Name') ?? ''
       const vals = vr.values ?? vr.Values
       const values = Array.isArray(vals)
         ? vals.map((x) => (typeof x === 'string' ? x : x != null ? String(x) : '')).filter(Boolean)
         : []
-      return { name: vn, values }
+      const defaultValue = pickStr(vr, 'defaultValue', 'DefaultValue') ?? ''
+      const rawAdj = vr.valuePriceAdjustments ?? vr.ValuePriceAdjustments
+      let valuePriceAdjustments: Record<string, number> | undefined
+      if (rawAdj && typeof rawAdj === 'object' && !Array.isArray(rawAdj)) {
+        const m: Record<string, number> = {}
+        for (const [k, v] of Object.entries(rawAdj as Record<string, unknown>)) {
+          if (typeof v === 'number' && Number.isFinite(v)) m[k] = v
+        }
+        if (Object.keys(m).length) valuePriceAdjustments = m
+      }
+      return { name: vn, values, defaultValue, valuePriceAdjustments }
     })
   }
 
@@ -180,7 +191,12 @@ export type CatalogProductRow = {
   categoryId?: string
   seo?: { slug?: string; metaTitle?: string; metaDescription?: string }
   status?: { isPublished?: boolean; visibility?: string; scheduledAt?: string | null }
-  variants?: { name: string; values: string[] }[]
+  variants?: {
+    name: string
+    values: string[]
+    defaultValue?: string
+    valuePriceAdjustments?: Record<string, number>
+  }[]
   media?: unknown[]
 }
 

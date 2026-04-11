@@ -1,4 +1,5 @@
 import { uploadBlogBodyImage } from './api/blogs'
+import { parseEditorJsBody, type EditorJsBlock } from './editorjs-body'
 
 /** Unique blob: URLs referenced by images in blog HTML fragments. */
 export function collectBlobImageSrcs(html: string): string[] {
@@ -50,4 +51,41 @@ export async function replaceBlobImagesInBlogHtml(
   }
 
   return wrap.innerHTML
+}
+
+/** Unique blob: URLs in Editor.js JSON (`blogFigure` blocks). */
+export function collectBlobUrlsFromEditorJsJson(body: string): string[] {
+  const p = parseEditorJsBody(body)
+  if (!p?.blocks) return []
+  const seen = new Set<string>()
+  for (const b of p.blocks) {
+    if (b.type === 'blogFigure' && typeof b.data?.src === 'string' && b.data.src.startsWith('blob:')) {
+      seen.add(b.data.src)
+    }
+  }
+  return [...seen]
+}
+
+export async function replaceBlobUrlsInEditorJsJson(
+  body: string,
+  token: string,
+  blobToFile: ReadonlyMap<string, File>,
+): Promise<string> {
+  const p = parseEditorJsBody(body)
+  if (!p?.blocks) return body
+  const blocks = structuredClone(p.blocks) as EditorJsBlock[]
+  for (const b of blocks) {
+    if (b.type === 'blogFigure' && typeof b.data?.src === 'string' && b.data.src.startsWith('blob:')) {
+      const blobSrc = b.data.src
+      const file = blobToFile.get(blobSrc)
+      if (!file) {
+        throw new Error(
+          'A draft image could not be found. Remove that image block, add the file again, then save.',
+        )
+      }
+      const publicUrl = await uploadBlogBodyImage(token, file)
+      b.data.src = publicUrl
+    }
+  }
+  return JSON.stringify({ ...p, blocks, time: Date.now() })
 }

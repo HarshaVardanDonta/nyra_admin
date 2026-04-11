@@ -3,142 +3,66 @@
  * Matches dark “magazine” blog layout: pale headings, check lists, green callout, figure captions.
  */
 
+/**
+ * Admin Editor.js mount — keep article prose rules off .codex-editor (they fight block UI).
+ */
+.blog-rich-editor {
+  overflow: visible;
+}
+
+.blog-editor-js-holder {
+  position: relative;
+  overflow: visible;
+}
+
+/* Published / preview prose: no slab background — matches page (light or dark). */
 .blog-article-prose {
-  --blog-bg: #050505;
-  --blog-surface: #0a0a0a;
-  --blog-text: #d4d4d8;
-  --blog-muted: #a1a1aa;
-  --blog-heading: #bae6fd;
-  --blog-heading-strong: #f0f9ff;
-  --blog-h3: #e0f2fe;
-  --blog-link: #7dd3fc;
-  --blog-link-hover: #bae6fd;
+  --blog-text: #0f172a;
+  --blog-muted: #64748b;
+  --blog-heading-strong: #0f172a;
+  --blog-heading: #0369a1;
+  --blog-h3: #0f766e;
+  --blog-link: #2563eb;
+  --blog-link-hover: #1d4ed8;
+  --blog-strong: #0f172a;
+  --blog-code-bg: #f1f5f9;
+  --blog-code-fg: #0f172a;
+  --blog-pre-bg: #f1f5f9;
+  --blog-hr: #e2e8f0;
+  --blog-bq-border: #cbd5e1;
+  --blog-figure-frame-bg: #e2e8f0;
   --blog-callout-bg: #14532d;
   --blog-callout-border: #166534;
-  --blog-callout-text: #bbf7d0;
-  --blog-caption-bg: #cbd5e1;
+  --blog-callout-text: #ecfdf5;
+  --blog-caption-bg: #e2e8f0;
   --blog-caption-text: #0f172a;
   --blog-check: #22c55e;
   --blog-check-inner: #052e16;
 
-  background: var(--blog-surface);
+  background: transparent;
   color: var(--blog-text);
   font-family: Inter, ui-sans-serif, system-ui, sans-serif;
   line-height: 1.75;
   font-size: 1rem;
 }
 
-/* ---------------------------
- * Editor.js (editing UI)
- * Improve visibility of the "+ Add" and "Tune" buttons on dark canvas.
- * Scoped to blog editor surface so it doesn't affect other pages.
- * --------------------------- */
-.blog-article-prose .codex-editor,
-.blog-article-prose .ce-editor,
-.blog-article-prose .ce-block,
-.blog-article-prose .ce-toolbar {
-  color: inherit;
-}
-
-/* Ensure the floating toolbar actions are always visible. */
-.blog-article-prose .ce-toolbar__actions {
-  opacity: 1;
-  visibility: visible;
-  z-index: 30;
-}
-
-.blog-article-prose .ce-toolbar {
-  z-index: 25;
-}
-
-/* "+ Add" and "Tune" buttons */
-.blog-article-prose .ce-toolbar__plus,
-.blog-article-prose .ce-toolbar__settings-btn {
-  background: rgba(24, 24, 27, 0.92);
-  border: 1px solid rgba(148, 163, 184, 0.35);
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
-  color: #e5e7eb;
-}
-
-.blog-article-prose .ce-toolbar__plus:hover,
-.blog-article-prose .ce-toolbar__settings-btn:hover {
-  background: rgba(39, 39, 42, 0.96);
-  border-color: rgba(186, 230, 253, 0.5);
-}
-
-.blog-article-prose .ce-toolbar__plus svg,
-.blog-article-prose .ce-toolbar__settings-btn svg {
-  color: currentColor;
-  fill: currentColor;
-  stroke: currentColor;
-}
-
-/* Popovers: block chooser & settings panel */
-.blog-article-prose .ce-popover,
-.blog-article-prose .ce-settings {
-  background: rgba(10, 10, 10, 0.98);
-  border: 1px solid rgba(148, 163, 184, 0.28);
-  color: #e5e7eb;
-}
-
-/* Inline toolbar (Ctrl + /) */
-.blog-article-prose .ce-inline-toolbar,
-.blog-article-prose .ce-inline-toolbar__dropdown,
-.blog-article-prose .ce-inline-toolbar__actions {
-  opacity: 1;
-  visibility: visible;
-}
-
-.blog-article-prose .ce-inline-toolbar {
-  background: rgba(10, 10, 10, 0.98);
-  border: 1px solid rgba(148, 163, 184, 0.28);
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
-  z-index: 60;
-}
-
-.blog-article-prose .ce-inline-tool,
-.blog-article-prose .ce-inline-toolbar__dropdown {
-  color: #e5e7eb;
-}
-
-.blog-article-prose .ce-inline-tool:hover,
-.blog-article-prose .ce-inline-toolbar__dropdown:hover {
-  background: rgba(30, 41, 59, 0.35);
-}
-
-.blog-article-prose .ce-inline-tool svg {
-  color: currentColor;
-  fill: currentColor;
-  stroke: currentColor;
-}
-
-.blog-article-prose .ce-popover__item,
-.blog-article-prose .ce-settings__button {
-  color: inherit;
-}
-
-.blog-article-prose .ce-popover__item:hover,
-.blog-article-prose .ce-settings__button:hover {
-  background: rgba(30, 41, 59, 0.35);
-}
-
-.blog-article-prose .ce-popover__search {
-  background: rgba(24, 24, 27, 0.9);
-  border: 1px solid rgba(148, 163, 184, 0.28);
-  color: #e5e7eb;
-}
-
-.blog-article-prose .ce-popover__search::placeholder {
-  color: rgba(161, 161, 170, 0.9);
-}
-
-/* Editor.js redactor spacing (remove excess bottom padding) */
-.blog-article-prose .codex-editor__redactor {
-  padding-bottom: 0.5rem !important;
-}
-
-.blog-article-prose .ce-block:last-child {
-  margin-bottom: 0 !important;
+html[data-theme='dark'] .blog-article-prose {
+  --blog-text: #e2e8f0;
+  --blog-muted: #94a3b8;
+  --blog-heading-strong: #f8fafc;
+  --blog-heading: #7dd3fc;
+  --blog-h3: #bae6fd;
+  --blog-link: #7dd3fc;
+  --blog-link-hover: #bae6fd;
+  --blog-strong: #f4f4f5;
+  --blog-code-bg: #27272a;
+  --blog-code-fg: #e4e4e7;
+  --blog-pre-bg: #27272a;
+  --blog-hr: #3f3f46;
+  --blog-bq-border: #52525b;
+  --blog-figure-frame-bg: #18181b;
+  --blog-caption-bg: #cbd5e1;
+  --blog-caption-text: #0f172a;
 }
 
 .blog-article-prose .ProseMirror {
@@ -185,7 +109,7 @@
 }
 
 .blog-article-prose strong {
-  color: #f4f4f5;
+  color: var(--blog-strong);
   font-weight: 600;
 }
 
@@ -232,7 +156,7 @@
 .blog-article-prose blockquote {
   margin: 1.25rem 0;
   padding: 0.65rem 0 0.65rem 1rem;
-  border-left: 3px solid #52525b;
+  border-left: 3px solid var(--blog-bq-border);
   color: var(--blog-muted);
   font-style: italic;
 }
@@ -265,7 +189,7 @@
   border-radius: 14px 14px 0 0;
   overflow: hidden;
   line-height: 0;
-  background: #18181b;
+  background: var(--blog-figure-frame-bg);
 }
 .blog-article-prose .blog-figure-img {
   display: block;
@@ -340,14 +264,16 @@
   font-size: 0.9em;
   padding: 0.1em 0.35em;
   border-radius: 0.25rem;
-  background: #18181b;
+  background: var(--blog-code-bg);
+  color: var(--blog-code-fg);
 }
 
 .blog-article-prose pre {
   margin: 1rem 0;
   padding: 0.85rem 1rem;
   border-radius: 0.5rem;
-  background: #18181b;
+  background: var(--blog-pre-bg);
+  color: var(--blog-code-fg);
   overflow-x: auto;
 }
 .blog-article-prose pre code {
@@ -358,6 +284,6 @@
 /* Horizontal rule */
 .blog-article-prose hr {
   border: 0;
-  border-top: 1px solid #27272a;
+  border-top: 1px solid var(--blog-hr);
   margin: 2rem 0;
 }

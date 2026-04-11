@@ -9,29 +9,10 @@ import {
   type BlogAnalytics,
   type BlogRecord,
 } from '../lib/api/blogs'
+import { BlogBodyRenderer } from '../components/blog-body-renderer'
 
 function formatInt(n: number) {
   return new Intl.NumberFormat('en-IN').format(n)
-}
-
-function BlogBodyContent({ body }: { body: string }) {
-  const t = body.trim()
-  const looksLikeHtml = t.startsWith('<') && /<\/[a-z][\s>]|<br\s*\/?>/i.test(t)
-  if (looksLikeHtml) {
-    return (
-      <div
-        className="blog-body-html blog-article-prose rounded-xl border border-slate-200 p-4 text-sm dark:border-slate-800"
-        dangerouslySetInnerHTML={{ __html: body }}
-      />
-    )
-  }
-  return (
-    <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-4 dark:border-slate-800 dark:bg-slate-900/60">
-      <pre className="whitespace-pre-wrap break-words font-sans text-sm leading-relaxed text-slate-800 dark:text-slate-200">
-        {body}
-      </pre>
-    </div>
-  )
 }
 
 export function BlogDetailPage() {
@@ -257,7 +238,9 @@ export function BlogDetailPage() {
         </section>
       ) : null}
 
-      <BlogBodyContent body={blog.body} />
+      <div className="rounded-xl border border-slate-200 p-4 text-sm dark:border-slate-800">
+        <BlogBodyRenderer body={blog.body} />
+      </div>
     </div>
   )
 }
