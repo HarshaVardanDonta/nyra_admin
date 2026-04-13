@@ -68,7 +68,6 @@ function BlogEditorPageInner() {
   const [slugTouched, setSlugTouched] = useState(false)
   const [body, setBody] = useState('') // stored as HTML (API/back-compat)
   const [editorKey, setEditorKey] = useState(0)
-  const bodyApiRef = useRef<{ getHtml: () => Promise<string> } | null>(null)
   const [selectedTags, setSelectedTags] = useState<string[]>([])
   const [tagInput, setTagInput] = useState('')
   const [tagSuggestions, setTagSuggestions] = useState<string[]>([])

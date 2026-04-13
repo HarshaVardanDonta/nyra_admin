@@ -23,6 +23,8 @@ function looksLikeEditorJsJson(s: string): boolean {
   }
 }
 
+type ConvertedHtmlBlock = ReturnType<typeof convertHtmlToBlocks>[number]
+
 function looksLikeHtml(s: string): boolean {
   const t = s.trim()
   return t.startsWith('<') && /<\/[a-z][\s>]|<br\s*\/?>/i.test(t)
@@ -75,7 +77,7 @@ export function BlogBodyEditorJs({ initialBody, onReady }: BlogBodyEditorJsProps
           const wrap = doc.getElementById('__blogHtml')
           const blocks = wrap ? convertHtmlToBlocks(wrap) : []
           data = {
-            blocks: blocks.map((b) => {
+            blocks: blocks.map((b: ConvertedHtmlBlock) => {
               if (b.type === 'image') {
                 const img = b as { type: 'image'; data: { url: string; caption: string } }
                 return {
