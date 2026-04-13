@@ -13,6 +13,10 @@ const AnalyticsPage = lazy(() =>
   import('./pages/analytics-page').then((m) => ({ default: m.AnalyticsPage })),
 )
 
+const ReviewsInsightsPage = lazy(() =>
+  import('./pages/reviews-insights-page').then((m) => ({ default: m.ReviewsInsightsPage })),
+)
+
 const ProductsPage = lazy(() =>
   import('./pages/products-page').then((m) => ({ default: m.ProductsPage })),
 )
@@ -69,6 +73,24 @@ const PromotionDetailPage = lazy(() =>
   import('./pages/promotion-detail-page').then((m) => ({ default: m.PromotionDetailPage })),
 )
 
+const ExclusiveOffersPage = lazy(() =>
+  import('./pages/exclusive-offers-page').then((m) => ({ default: m.ExclusiveOffersPage })),
+)
+
+const ExclusiveOfferEditorPage = lazy(() =>
+  import('./pages/exclusive-offer-editor-page').then((m) => ({ default: m.ExclusiveOfferEditorPage })),
+)
+
+const ExclusiveOfferDetailPage = lazy(() =>
+  import('./pages/exclusive-offer-detail-page').then((m) => ({ default: m.ExclusiveOfferDetailPage })),
+)
+
+const ExclusiveOfferFilterCategoriesPage = lazy(() =>
+  import('./pages/exclusive-offer-filter-categories-page').then((m) => ({
+    default: m.ExclusiveOfferFilterCategoriesPage,
+  })),
+)
+
 const BlogsPage = lazy(() =>
   import('./pages/blogs-page').then((m) => ({ default: m.BlogsPage })),
 )
@@ -117,6 +139,12 @@ const CouponEditorPage = lazy(() =>
   import('./pages/coupon-editor-page').then((m) => ({ default: m.CouponEditorPage })),
 )
 
+const DeliveryPincodeRulesPage = lazy(() =>
+  import('./pages/delivery-pincode-rules-page').then((m) => ({
+    default: m.DeliveryPincodeRulesPage,
+  })),
+)
+
 const CustomersPage = lazy(() =>
   import('./pages/customers-page').then((m) => ({ default: m.CustomersPage })),
 )
@@ -151,6 +179,14 @@ function App() {
                   element={
                     <Suspense fallback={pageFallback}>
                       <AnalyticsPage />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="/reviews-insights"
+                  element={
+                    <Suspense fallback={pageFallback}>
+                      <ReviewsInsightsPage />
                     </Suspense>
                   }
                 />
@@ -307,6 +343,46 @@ function App() {
                   }
                 />
                 <Route
+                  path="/exclusive-offers"
+                  element={
+                    <Suspense fallback={pageFallback}>
+                      <ExclusiveOffersPage />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="/exclusive-offers/filter-categories"
+                  element={
+                    <Suspense fallback={pageFallback}>
+                      <ExclusiveOfferFilterCategoriesPage />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="/exclusive-offers/new"
+                  element={
+                    <Suspense fallback={pageFallback}>
+                      <ExclusiveOfferEditorPage />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="/exclusive-offers/:offerId/edit"
+                  element={
+                    <Suspense fallback={pageFallback}>
+                      <ExclusiveOfferEditorPage />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="/exclusive-offers/:offerId"
+                  element={
+                    <Suspense fallback={pageFallback}>
+                      <ExclusiveOfferDetailPage />
+                    </Suspense>
+                  }
+                />
+                <Route
                   path="/blogs"
                   element={
                     <Suspense fallback={pageFallback}>
@@ -423,6 +499,14 @@ function App() {
                   element={
                     <Suspense fallback={pageFallback}>
                       <CouponDetailPage />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="/delivery-pincode-rules"
+                  element={
+                    <Suspense fallback={pageFallback}>
+                      <DeliveryPincodeRulesPage />
                     </Suspense>
                   }
                 />

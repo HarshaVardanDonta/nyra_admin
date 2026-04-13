@@ -12,11 +12,15 @@ type NavIconName =
   | 'layers'
   | 'ticket'
   | 'megaphone'
+  | 'gift'
+  | 'filter'
   | 'document'
   | 'layout'
   | 'users'
   | 'git'
   | 'chart'
+  | 'star'
+  | 'truck'
   | 'settings'
 
 type NavEntry =
@@ -81,6 +85,26 @@ function NavIcon({ name, className }: { name: NavIconName; className?: string })
           <path strokeLinecap="round" strokeLinejoin="round" d="M11 5L6 9H3v6h3l5 4V5zM15 9a4 4 0 010 6M19 5a8 8 0 010 14" />
         </svg>
       )
+    case 'gift':
+      return (
+        <svg className={c} fill="none" viewBox="0 0 24 24" strokeWidth={1.75} stroke="currentColor">
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14v9a2 2 0 01-2 2H7a2 2 0 01-2-2v-9zm0-4h14a2 2 0 012 2v2H3V6a2 2 0 012-2z"
+          />
+        </svg>
+      )
+    case 'filter':
+      return (
+        <svg className={c} fill="none" viewBox="0 0 24 24" strokeWidth={1.75} stroke="currentColor">
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M3 5h18l-7 8v5l-4 2v-7L3 5z"
+          />
+        </svg>
+      )
     case 'document':
       return (
         <svg className={c} fill="none" viewBox="0 0 24 24" strokeWidth={1.75} stroke="currentColor">
@@ -113,6 +137,26 @@ function NavIcon({ name, className }: { name: NavIconName; className?: string })
       return (
         <svg className={c} fill="none" viewBox="0 0 24 24" strokeWidth={1.75} stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" d="M4 19V5M9 19v-6m5 6V9m5 10V4" />
+        </svg>
+      )
+    case 'star':
+      return (
+        <svg className={c} fill="none" viewBox="0 0 24 24" strokeWidth={1.75} stroke="currentColor">
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M11.48 3.499a.562.562 0 0 1 1.04 0l2.065 4.502 4.978.458a.563.563 0 0 1 .322.97l-3.67 3.405 1.05 4.783a.562.562 0 0 1-.844.59l-4.347-2.45-4.347 2.45a.563.563 0 0 1-.844-.59l1.05-4.783-3.67-3.405a.563.563 0 0 1 .322-.97l4.978-.458 2.065-4.502Z"
+          />
+        </svg>
+      )
+    case 'truck':
+      return (
+        <svg className={c} fill="none" viewBox="0 0 24 24" strokeWidth={1.75} stroke="currentColor">
+          <path d="M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2" />
+          <path d="M15 18H9" />
+          <path d="M19 18h2a1 1 0 0 0 1-1v-3.65a1 1 0 0 0-.22-.624l-3.48-4.35A1 1 0 0 0 17.52 8H14" />
+          <circle cx="17" cy="18" r="2" />
+          <circle cx="7" cy="18" r="2" />
         </svg>
       )
     case 'settings':
@@ -292,13 +336,22 @@ export function AdminDrawer({
         <NavGroup title="Marketing" collapsed={collapsed}>
           <NavRow to="/coupons" label="Coupons" icon="ticket" collapsed={collapsed} />
           <NavRow to="/promotions" label="Promotions" icon="megaphone" collapsed={collapsed} />
+          <NavRow to="/exclusive-offers" label="Exclusive offers" icon="gift" collapsed={collapsed} />
+          <NavRow
+            to="/exclusive-offers/filter-categories"
+            label="Offer filter categories"
+            icon="filter"
+            collapsed={collapsed}
+          />
           <NavRow to="/blogs" label="Blogs" icon="document" collapsed={collapsed} />
           <NavRow to="/blog-promotions" label="Blog promotions" icon="layout" collapsed={collapsed} />
         </NavGroup>
         <NavGroup title="System" collapsed={collapsed}>
+          <NavRow to="/delivery-pincode-rules" label="Delivery pincodes" icon="truck" collapsed={collapsed} />
           <NavRow to="/users" label="Users" icon="users" collapsed={collapsed} />
           <NavRow to="/order-lifecycle" label="Order lifecycle" icon="git" collapsed={collapsed} />
           <NavRow to="/analytics" label="Analytics" icon="chart" collapsed={collapsed} />
+          <NavRow to="/reviews-insights" label="Reviews" icon="star" collapsed={collapsed} />
           <NavRow label="Settings" icon="settings" disabled collapsed={collapsed} />
         </NavGroup>
       </nav>

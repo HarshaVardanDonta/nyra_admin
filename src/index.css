@@ -5,6 +5,9 @@
 
 @theme {
   --font-sans: Inter, ui-sans-serif, system-ui, sans-serif;
+  /* Match storefront auth (nyra_web) for shared input focus / text */
+  --color-ink: #1a1a2e;
+  --color-brand-deep: #02512b;
 }
 
 /* Map `dark:` to admin theme (`data-theme` on `<html>`, set by `ThemeProvider`). */

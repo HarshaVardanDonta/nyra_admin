@@ -209,7 +209,7 @@ html[data-theme='dark'] .blog-article-prose {
   border-radius: 0 0 14px 14px;
 }
 
-/* TipTap placeholder */
+/* Empty block placeholder (legacy ProseMirror markup in saved HTML) */
 .blog-article-prose .ProseMirror p.is-editor-empty:first-child::before {
   color: #71717a;
   content: attr(data-placeholder);

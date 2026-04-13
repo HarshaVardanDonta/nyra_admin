@@ -104,6 +104,14 @@ export function LoginPage() {
   const showOtpStep = Boolean(requestId)
   const trimmedPhone = phone.trim()
 
+  const localDigits = phoneInput.replace(/\D/g, '')
+  const canSendOtp =
+    country === '+91' &&
+    localDigits.length === 10 &&
+    /^[6-9]/.test(localDigits) &&
+    !loading &&
+    !(widgetMode && !widgetReady)
+
   async function handleSendOtp(e: FormEvent) {
     e.preventDefault()
     setError(null)
@@ -142,6 +150,7 @@ export function LoginPage() {
     e.preventDefault()
     setError(null)
     const trimmedOtp = otp.trim()
+    const localPhone = normalizeIndiaLocalPhone(phoneInput)
     if (!requestId || !trimmedOtp) {
       setError('Enter the code we sent you')
       return
@@ -160,7 +169,7 @@ export function LoginPage() {
         navigate('/dashboard', { replace: true })
       } else {
         const { token, refresh_token } = await verifyAdminOtp({
-          phone: trimmedPhone,
+          phone: localPhone,
           otp: trimmedOtp,
           request_id: requestId,
         })
@@ -194,6 +203,11 @@ export function LoginPage() {
     setOtp('')
     setError(null)
   }
+
+  const displayPhone =
+    localDigits.length === 10
+      ? `+91 ${localDigits.slice(0, 5)} ${localDigits.slice(5)}`
+      : `+91 ${localDigits}`
 
   return (
     <div className="relative h-full min-h-0 overflow-y-auto overscroll-y-contain bg-[radial-gradient(ellipse_80%_50%_at_50%_-20%,rgba(37,99,235,0.08),transparent),rgb(241_245_249)] dark:bg-[radial-gradient(ellipse_80%_50%_at_50%_-20%,rgba(37,99,235,0.12),transparent),rgb(11_17_32)]">
@@ -248,12 +262,12 @@ export function LoginPage() {
 
           {!showOtpStep ? (
             <form onSubmit={handleSendOtp} className="flex flex-col gap-4">
-              <div className="text-left">
+              <div className="w-full min-w-0">
                 <label
                   htmlFor="phone"
-                  className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400"
+                  className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-400"
                 >
-                  Phone
+                  Phone number
                 </label>
                 <PhoneInput
                   defaultCountry="in"
@@ -269,9 +283,14 @@ export function LoginPage() {
                   className="w-full [&_.react-international-phone-country-selector-button]:rounded-lg [&_.react-international-phone-country-selector-button]:border-slate-300 [&_.react-international-phone-country-selector-button]:bg-white dark:[&_.react-international-phone-country-selector-button]:border-slate-600 dark:[&_.react-international-phone-country-selector-button]:bg-slate-900 [&_.react-international-phone-country-selector-button]:text-slate-900 dark:[&_.react-international-phone-country-selector-button]:text-slate-50 [&_.react-international-phone-input]:w-full [&_.react-international-phone-input]:rounded-lg [&_.react-international-phone-input]:border-slate-300 [&_.react-international-phone-input]:bg-white [&_.react-international-phone-input]:px-3 [&_.react-international-phone-input]:py-2.5 [&_.react-international-phone-input]:text-sm [&_.react-international-phone-input]:text-slate-900 [&_.react-international-phone-input]:outline-none [&_.react-international-phone-input]:transition [&_.react-international-phone-input]:placeholder:text-slate-500 [&_.react-international-phone-input]:focus:border-blue-600 [&_.react-international-phone-input]:focus:ring-4 [&_.react-international-phone-input]:focus:ring-blue-500/20 dark:[&_.react-international-phone-input]:border-slate-600 dark:[&_.react-international-phone-input]:bg-slate-900 dark:[&_.react-international-phone-input]:text-slate-50 dark:[&_.react-international-phone-input]:placeholder:text-slate-400 dark:[&_.react-international-phone-input]:focus:border-blue-500"
                 />
               </div>
+              {country !== '+91' ? (
+                <p className="text-left text-xs text-amber-700 dark:text-amber-200/90">
+                  OTP is available for +91 only right now.
+                </p>
+              ) : null}
               <button
                 type="submit"
-                disabled={loading || (widgetMode && !widgetReady)}
+                disabled={!canSendOtp}
                 className="w-full rounded-lg bg-blue-600 py-2.5 text-sm font-medium text-white transition hover:bg-blue-700 disabled:opacity-60"
               >
                 {loading ? 'Sending…' : 'Send OTP'}
@@ -307,7 +326,7 @@ export function LoginPage() {
               <div className="text-left">
                 <label
                   htmlFor="otp"
-                  className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400"
+                  className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-400"
                 >
                   One-time code
                 </label>
@@ -320,7 +339,7 @@ export function LoginPage() {
                   value={otp}
                   onChange={(ev) => setOtp(ev.target.value)}
                   placeholder="Enter OTP"
-                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-500 focus:border-blue-600 focus:ring-4 focus:ring-blue-500/20 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-50 dark:placeholder:text-slate-400 dark:focus:border-blue-500"
+                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3.5 text-sm text-ink placeholder:text-slate-400 focus:border-brand-deep focus:outline-none focus:ring-2 focus:ring-brand-deep/20 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-50 dark:placeholder:text-slate-400 dark:focus:border-brand-deep dark:focus:ring-brand-deep/30"
                 />
               </div>
               <button
