@@ -145,6 +145,12 @@ const DeliveryPincodeRulesPage = lazy(() =>
   })),
 )
 
+const StoreTaxSettingsPage = lazy(() =>
+  import('./pages/store-tax-settings-page').then((m) => ({
+    default: m.StoreTaxSettingsPage,
+  })),
+)
+
 const CustomersPage = lazy(() =>
   import('./pages/customers-page').then((m) => ({ default: m.CustomersPage })),
 )
@@ -507,6 +513,14 @@ function App() {
                   element={
                     <Suspense fallback={pageFallback}>
                       <DeliveryPincodeRulesPage />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="/store-tax"
+                  element={
+                    <Suspense fallback={pageFallback}>
+                      <StoreTaxSettingsPage />
                     </Suspense>
                   }
                 />

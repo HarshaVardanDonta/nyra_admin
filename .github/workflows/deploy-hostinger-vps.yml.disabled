@@ -1,3 +1,4 @@
+# Disabled: GitHub Actions only loads .yml/.yaml — rename this file to deploy-hostinger-vps.yml to re-enable.
 name: Deploy to Hostinger VPS
 
 on:
