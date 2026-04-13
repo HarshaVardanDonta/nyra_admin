@@ -221,11 +221,21 @@ export type OrderAdminLineItem = {
   variant_label: string | null
 }
 
+export type OrderAdminTaxBreakdownRow = {
+  /** GST bucket name (CGST, SGST, …); absent on legacy orders. */
+  label?: string
+  rate: number
+  taxable_base: number
+  tax_amount: number
+}
+
 export type OrderAdminSummary = {
   items_subtotal: number
+  discount_amount: number
   shipping_amount: number
   tax_rate: number
   tax_amount: number
+  tax_breakdown: OrderAdminTaxBreakdownRow[]
   grand_total: number
 }
 
@@ -367,6 +377,24 @@ function parseAdminDetails(raw: unknown): OrderAdminDetails {
     }
   }
 
+  function parseTaxBreakdown(raw: unknown): OrderAdminTaxBreakdownRow[] {
+    if (!Array.isArray(raw)) return []
+    const out: OrderAdminTaxBreakdownRow[] = []
+    for (const x of raw) {
+      const r = asRecord(x)
+      if (!r) continue
+      const rate = pickNum(r, 'rate')
+      if (rate === undefined) continue
+      out.push({
+        label: pickStr(r, 'label'),
+        rate,
+        taxable_base: pickNum(r, 'taxable_base') ?? 0,
+        tax_amount: pickNum(r, 'tax_amount') ?? 0,
+      })
+    }
+    return out
+  }
+
   return {
     order: {
       id: pickNum(ord, 'id') ?? 0,
@@ -384,9 +412,11 @@ function parseAdminDetails(raw: unknown): OrderAdminDetails {
     items,
     order_summary: {
       items_subtotal: pickNum(summary, 'items_subtotal') ?? 0,
+      discount_amount: pickNum(summary, 'discount_amount') ?? 0,
       shipping_amount: pickNum(summary, 'shipping_amount') ?? 0,
       tax_rate: pickNum(summary, 'tax_rate') ?? 0,
       tax_amount: pickNum(summary, 'tax_amount') ?? 0,
+      tax_breakdown: parseTaxBreakdown(summary.tax_breakdown),
       grand_total: pickNum(summary, 'grand_total') ?? 0,
     },
     user,

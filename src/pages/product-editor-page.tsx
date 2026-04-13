@@ -183,6 +183,14 @@ const APPLICATION_GUIDE_KEYS: (keyof ApplicationGuideRow)[] = [
   'technicalSpecs',
 ]
 
+function taxRateToPercentString(r: number | null | undefined): string {
+  if (r == null || !Number.isFinite(r)) return ''
+  const pct = r <= 1 ? r * 100 : r
+  const rounded = Math.round(pct * 1e6) / 1e6
+  if (Number.isInteger(rounded)) return String(rounded)
+  return String(rounded)
+}
+
 function mapProductToForm(p: CatalogProductRow) {
   const variants: ProductVariantInput[] = Array.isArray(p.variants)
     ? p.variants.map((v) => ({
@@ -216,6 +224,23 @@ function mapProductToForm(p: CatalogProductRow) {
     metaDescription: p.seo?.metaDescription ?? '',
     visibility: p.status?.visibility ?? 'public',
     scheduledAt: p.status?.scheduledAt ? p.status.scheduledAt.slice(0, 16) : '',
+    productTaxOverride: Boolean(
+      (p.taxComponents && p.taxComponents.length > 0) ||
+        (p.taxRate != null && p.taxRate !== undefined),
+    ),
+    taxRows:
+      p.taxComponents && p.taxComponents.length
+        ? p.taxComponents.map((c, i) => ({
+            id: `tc-${i}`,
+            label: c.label,
+            percentStr: taxRateToPercentString(c.rate),
+          }))
+        : p.taxRate != null && p.taxRate !== undefined
+          ? [{ id: 'legacy', label: 'GST', percentStr: taxRateToPercentString(p.taxRate) }]
+          : [
+              { id: 'a', label: 'CGST', percentStr: '9' },
+              { id: 'b', label: 'SGST', percentStr: '9' },
+            ],
   }
 }
 
@@ -265,6 +290,13 @@ export function ProductEditorPage() {
   const [metaDescription, setMetaDescription] = useState('')
   const [visibility, setVisibility] = useState('public')
   const [scheduledAt, setScheduledAt] = useState('')
+  const [productTaxOverride, setProductTaxOverride] = useState(false)
+  const [taxRows, setTaxRows] = useState<
+    { id: string; label: string; percentStr: string }[]
+  >([
+    { id: 'a', label: 'CGST', percentStr: '9' },
+    { id: 'b', label: 'SGST', percentStr: '9' },
+  ])
   const [mediaFiles, setMediaFiles] = useState<File[]>([])
   const [mediaJsonInput, setMediaJsonInput] = useState('')
   const [existingMedia, setExistingMedia] = useState<unknown[]>([])
@@ -318,6 +350,8 @@ export function ProductEditorPage() {
         setMetaDescription(f.metaDescription)
         setVisibility(f.visibility)
         setScheduledAt(f.scheduledAt)
+        setProductTaxOverride(f.productTaxOverride)
+        setTaxRows(f.taxRows)
         setExistingMedia(Array.isArray(p.media) ? p.media : [])
         setExistingThumb(p.thumbnailUrl ? resolveMediaUrl(p.thumbnailUrl) : '')
       } catch (e) {
@@ -486,6 +520,20 @@ export function ProductEditorPage() {
     for (const file of mediaFiles.slice(0, 10)) {
       fd.append('media', file)
     }
+    if (productTaxOverride) {
+      const comps: { label: string; rate: number }[] = []
+      for (const row of taxRows) {
+        const label = row.label.trim() || 'Tax'
+        const t = row.percentStr.trim().replace(/%/g, '')
+        if (!t) continue
+        const n = Number.parseFloat(t.replace(/[^0-9.-]/g, ''))
+        if (!Number.isFinite(n) || n < 0 || n > 100) continue
+        comps.push({ label, rate: n / 100 })
+      }
+      if (comps.length > 0) {
+        fd.set('taxComponents', JSON.stringify(comps))
+      }
+    }
     return fd
   }
 
@@ -514,6 +562,30 @@ export function ProductEditorPage() {
     if (variantPriceError) {
       showToast(variantPriceError, 'error')
       return
+    }
+    if (productTaxOverride) {
+      let sum = 0
+      for (const row of taxRows) {
+        const t = row.percentStr.trim().replace(/%/g, '')
+        if (!t) {
+          showToast('Fill each tax row percent or remove the row.', 'error')
+          return
+        }
+        const n = Number.parseFloat(t.replace(/[^0-9.-]/g, ''))
+        if (!Number.isFinite(n) || n < 0 || n > 100) {
+          showToast('Each tax percent must be between 0 and 100.', 'error')
+          return
+        }
+        sum += n
+      }
+      if (taxRows.length === 0) {
+        showToast('Add at least one tax component or turn off override.', 'error')
+        return
+      }
+      if (sum > 100.0001) {
+        showToast('Sum of tax percents cannot exceed 100%.', 'error')
+        return
+      }
     }
 
     const published = mode === 'publish'
@@ -1172,6 +1244,70 @@ export function ProductEditorPage() {
                   />
                 </div>
               </div>
+              <Toggle
+                id={`${baseId}-tax-ov`}
+                checked={productTaxOverride}
+                onChange={setProductTaxOverride}
+                label="Override store tax structure"
+                sub="CGST / SGST / IGST rows"
+              />
+              {productTaxOverride ? (
+                <div className="rounded-lg border border-slate-200 p-3 dark:border-slate-700">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Components</span>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setTaxRows((r) => [
+                          ...r,
+                          { id: `${baseId}-tx-${Date.now()}`, label: '', percentStr: '' },
+                        ])
+                      }
+                      className="text-xs font-medium text-blue-600 dark:text-blue-400"
+                    >
+                      + Add
+                    </button>
+                  </div>
+                  <ul className="mt-2 space-y-2">
+                    {taxRows.map((row, i) => (
+                      <li key={row.id} className="flex flex-wrap items-end gap-2">
+                        <input
+                          value={row.label}
+                          onChange={(e) =>
+                            setTaxRows((prev) =>
+                              prev.map((x, j) => (j === i ? { ...x, label: e.target.value } : x)),
+                            )
+                          }
+                          placeholder="Label"
+                          className="min-w-[88px] flex-1 rounded border border-slate-200 bg-white px-2 py-1 text-xs dark:border-slate-600 dark:bg-slate-900"
+                        />
+                        <input
+                          value={row.percentStr}
+                          onChange={(e) =>
+                            setTaxRows((prev) =>
+                              prev.map((x, j) => (j === i ? { ...x, percentStr: e.target.value } : x)),
+                            )
+                          }
+                          placeholder="%"
+                          inputMode="decimal"
+                          className="w-16 rounded border border-slate-200 bg-white px-2 py-1 text-xs dark:border-slate-600 dark:bg-slate-900"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setTaxRows((prev) => prev.filter((_, j) => j !== i))}
+                          disabled={taxRows.length <= 1}
+                          className="text-xs text-slate-500 disabled:opacity-30"
+                        >
+                          ✕
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                  <p className="mt-2 text-[10px] text-slate-500 dark:text-slate-400">
+                    Uncheck override to use store default. Sum of percents must be ≤ 100%.
+                  </p>
+                </div>
+              ) : null}
             </div>
           </section>
 

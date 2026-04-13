@@ -179,6 +179,9 @@ export function fullProductPatchFromListRow(
       metaDescription: row.seo?.metaDescription ?? '',
     },
     status,
+    taxRate: row.taxRate === undefined ? null : row.taxRate,
+    taxComponents:
+      row.taxComponents?.map((c) => ({ label: c.label, rate: c.rate })) ?? null,
   }
 }
 

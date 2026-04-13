@@ -62,6 +62,38 @@ function pickBool(o: Record<string, unknown>, camel: string, pascal: string): bo
   return undefined
 }
 
+function pickTaxComponents(o: Record<string, unknown>): CatalogTaxComponent[] | undefined {
+  const raw = o.taxComponents ?? o.TaxComponents
+  if (!Array.isArray(raw)) return undefined
+  const out: CatalogTaxComponent[] = []
+  for (const x of raw) {
+    if (!x || typeof x !== 'object') continue
+    const row = x as Record<string, unknown>
+    const label =
+      typeof row.label === 'string'
+        ? row.label
+        : typeof row.Label === 'string'
+          ? row.Label
+          : ''
+    const rv = row.rate ?? row.Rate
+    const rate =
+      typeof rv === 'number' && Number.isFinite(rv)
+        ? rv
+        : typeof rv === 'string' && rv.trim()
+          ? Number(rv)
+          : Number.NaN
+    if (!Number.isFinite(rate)) continue
+    out.push({ label: label.trim() || 'Tax', rate })
+  }
+  return out.length ? out : undefined
+}
+
+export type CatalogTaxComponent = {
+  label: string
+  /** 0..1 */
+  rate: number
+}
+
 /**
  * Admin/create responses may use Go-style PascalCase for nested fields; normalize to the shape the UI expects.
  */
@@ -155,6 +187,8 @@ export function normalizeCatalogProductRow(raw: unknown): CatalogProductRow {
     stockQuantity: pickNum(o, 'stockQuantity', 'StockQuantity'),
     isOutOfStock: pickBool(o, 'isOutOfStock', 'IsOutOfStock'),
     thumbnailUrl,
+    taxRate: pickNumOrNull(o, 'taxRate', 'TaxRate'),
+    taxComponents: pickTaxComponents(o),
     brandId: pickStr(o, 'brandId', 'BrandId'),
     categoryId: pickStr(o, 'categoryId', 'CategoryId'),
     brand:
@@ -185,6 +219,9 @@ export type CatalogProductRow = {
   stockQuantity?: number
   isOutOfStock?: boolean
   thumbnailUrl?: string
+  /** 0–1 decimal; null = store default */
+  taxRate?: number | null
+  taxComponents?: CatalogTaxComponent[]
   brand?: { id: string; name: string }
   category?: { id: string; name: string }
   brandId?: string

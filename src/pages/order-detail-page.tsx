@@ -25,6 +25,13 @@ function formatInt(n: number) {
   return new Intl.NumberFormat('en-IN').format(n)
 }
 
+function formatTaxRateLabel(rate: number): string {
+  if (rate <= 0) return '0%'
+  const pct = rate <= 1 ? rate * 100 : rate
+  const rounded = Number.isInteger(pct) ? String(pct) : pct.toFixed(1).replace(/\.0$/, '')
+  return `${rounded}%`
+}
+
 function formatDateTime(iso: string) {
   if (!iso) return '—'
   const d = new Date(iso)
@@ -157,11 +164,10 @@ export function OrderDetailPage() {
   const itemsCount = detail?.items.length ?? 0
   const taxPercentLabel = useMemo(() => {
     const r = detail?.order_summary.tax_rate ?? 0
-    if (r <= 0) return '0%'
-    const pct = r <= 1 ? r * 100 : r
-    const rounded = Number.isInteger(pct) ? String(pct) : pct.toFixed(1).replace(/\.0$/, '')
-    return `${rounded}%`
+    return formatTaxRateLabel(r)
   }, [detail?.order_summary.tax_rate])
+
+  const taxBreakdownRows = detail?.order_summary.tax_breakdown ?? []
 
   async function handleSaveStatus() {
     if (!detail) return
@@ -343,6 +349,13 @@ export function OrderDetailPage() {
               {order.current_status.name}
             </span>
           </div>
+          {order.current_status.name.trim().toLowerCase() === 'pending' &&
+          payment.status.trim().toLowerCase() === 'paid' ? (
+            <p className="mt-3 rounded-lg border border-emerald-500/35 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-900 dark:text-emerald-100">
+              Payment received. Confirm the order (set status to <span className="font-semibold">Confirmed</span>)
+              to start fulfillment. Refunds remain manual—use your bank or PhonePe dashboard as needed.
+            </p>
+          ) : null}
           <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
             Last update: {formatDateTime(order.last_updated_at)}
           </p>
@@ -387,14 +400,65 @@ export function OrderDetailPage() {
               </span>
               <span className="tabular-nums">{formatMoney(sum.items_subtotal)}</span>
             </li>
+            {sum.discount_amount > 0 ? (
+              <li className="flex justify-between text-emerald-700 dark:text-emerald-300">
+                <span>Discount</span>
+                <span className="tabular-nums">−{formatMoney(sum.discount_amount)}</span>
+              </li>
+            ) : null}
             <li className="flex justify-between text-slate-600 dark:text-slate-300">
               <span>Shipping</span>
               <span className="tabular-nums">{formatMoney(sum.shipping_amount)}</span>
             </li>
-            <li className="flex justify-between text-slate-600 dark:text-slate-300">
-              <span>Tax ({taxPercentLabel})</span>
-              <span className="tabular-nums">{formatMoney(sum.tax_amount)}</span>
-            </li>
+            {taxBreakdownRows.length > 1 ? (
+              <li className="border-t border-slate-200 pt-2 dark:border-slate-700">
+                <p className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                  Tax
+                </p>
+                <ul className="mt-2 space-y-1.5">
+                  {taxBreakdownRows.map((row, i) => (
+                    <li
+                      key={`${row.label ?? ''}-${row.rate}-${i}`}
+                      className="flex justify-between gap-3 text-sm text-slate-600 dark:text-slate-300"
+                    >
+                      <span className="min-w-0">
+                        {row.label?.trim() ? `${row.label.trim()} ` : ''}
+                        <span className="text-slate-500 dark:text-slate-400">
+                          ({formatTaxRateLabel(row.rate)} on {formatMoney(row.taxable_base)})
+                        </span>
+                      </span>
+                      <span className="tabular-nums shrink-0">{formatMoney(row.tax_amount)}</span>
+                    </li>
+                  ))}
+                </ul>
+                <div className="mt-2 flex justify-between text-sm font-medium text-slate-800 dark:text-slate-100">
+                  <span>Tax total</span>
+                  <span className="tabular-nums">{formatMoney(sum.tax_amount)}</span>
+                </div>
+              </li>
+            ) : (
+              <li className="flex justify-between text-slate-600 dark:text-slate-300">
+                <span>
+                  Tax
+                  {taxBreakdownRows[0] ? (
+                    <span className="text-slate-500 dark:text-slate-400">
+                      {' '}
+                      (
+                      {taxBreakdownRows[0].label?.trim()
+                        ? `${taxBreakdownRows[0].label.trim()} `
+                        : ''}
+                      {formatTaxRateLabel(taxBreakdownRows[0].rate)})
+                    </span>
+                  ) : (
+                    <span className="text-slate-500 dark:text-slate-400">
+                      {' '}
+                      ({taxPercentLabel})
+                    </span>
+                  )}
+                </span>
+                <span className="tabular-nums">{formatMoney(sum.tax_amount)}</span>
+              </li>
+            )}
           </ul>
           <p className="mt-4 border-t border-slate-200 pt-4 text-lg font-semibold text-blue-600 dark:text-blue-400 dark:border-slate-700">
             {formatMoney(sum.grand_total)}
