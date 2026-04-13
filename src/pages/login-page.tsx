@@ -23,6 +23,22 @@ import {
 
 const INDIA_ONLY_COUNTRIES = defaultCountries.filter((c) => c[1] === 'in')
 
+/** E.164 +91XXXXXXXXXX for Nyra admin OTP APIs. */
+function normalizeIndiaLocalPhone(raw: string): string {
+  const d = raw.replace(/\D/g, '')
+  if (d.length >= 12 && d.startsWith('91')) {
+    return `+${d}`
+  }
+  if (d.length === 10) {
+    return `+91${d}`
+  }
+  const t = raw.trim()
+  if (t.startsWith('+')) {
+    return t
+  }
+  return d ? `+91${d}` : ''
+}
+
 function BrandMark() {
   return (
     <div className="flex items-center justify-center gap-2.5">
@@ -104,9 +120,16 @@ export function LoginPage() {
   const showOtpStep = Boolean(requestId)
   const trimmedPhone = phone.trim()
 
-  const localDigits = phoneInput.replace(/\D/g, '')
+  const digits = phone.replace(/\D/g, '')
+  const localDigits =
+    digits.length >= 12 && digits.startsWith('91')
+      ? digits.slice(-10)
+      : digits.length === 10
+        ? digits
+        : ''
+  const isIndiaDial = trimmedPhone.startsWith('+91')
   const canSendOtp =
-    country === '+91' &&
+    isIndiaDial &&
     localDigits.length === 10 &&
     /^[6-9]/.test(localDigits) &&
     !loading &&
@@ -150,7 +173,7 @@ export function LoginPage() {
     e.preventDefault()
     setError(null)
     const trimmedOtp = otp.trim()
-    const localPhone = normalizeIndiaLocalPhone(phoneInput)
+    const localPhone = normalizeIndiaLocalPhone(phone)
     if (!requestId || !trimmedOtp) {
       setError('Enter the code we sent you')
       return
@@ -207,7 +230,7 @@ export function LoginPage() {
   const displayPhone =
     localDigits.length === 10
       ? `+91 ${localDigits.slice(0, 5)} ${localDigits.slice(5)}`
-      : `+91 ${localDigits}`
+      : trimmedPhone
 
   return (
     <div className="relative h-full min-h-0 overflow-y-auto overscroll-y-contain bg-[radial-gradient(ellipse_80%_50%_at_50%_-20%,rgba(37,99,235,0.08),transparent),rgb(241_245_249)] dark:bg-[radial-gradient(ellipse_80%_50%_at_50%_-20%,rgba(37,99,235,0.12),transparent),rgb(11_17_32)]">
@@ -283,7 +306,7 @@ export function LoginPage() {
                   className="w-full [&_.react-international-phone-country-selector-button]:rounded-lg [&_.react-international-phone-country-selector-button]:border-slate-300 [&_.react-international-phone-country-selector-button]:bg-white dark:[&_.react-international-phone-country-selector-button]:border-slate-600 dark:[&_.react-international-phone-country-selector-button]:bg-slate-900 [&_.react-international-phone-country-selector-button]:text-slate-900 dark:[&_.react-international-phone-country-selector-button]:text-slate-50 [&_.react-international-phone-input]:w-full [&_.react-international-phone-input]:rounded-lg [&_.react-international-phone-input]:border-slate-300 [&_.react-international-phone-input]:bg-white [&_.react-international-phone-input]:px-3 [&_.react-international-phone-input]:py-2.5 [&_.react-international-phone-input]:text-sm [&_.react-international-phone-input]:text-slate-900 [&_.react-international-phone-input]:outline-none [&_.react-international-phone-input]:transition [&_.react-international-phone-input]:placeholder:text-slate-500 [&_.react-international-phone-input]:focus:border-blue-600 [&_.react-international-phone-input]:focus:ring-4 [&_.react-international-phone-input]:focus:ring-blue-500/20 dark:[&_.react-international-phone-input]:border-slate-600 dark:[&_.react-international-phone-input]:bg-slate-900 dark:[&_.react-international-phone-input]:text-slate-50 dark:[&_.react-international-phone-input]:placeholder:text-slate-400 dark:[&_.react-international-phone-input]:focus:border-blue-500"
                 />
               </div>
-              {country !== '+91' ? (
+              {!isIndiaDial ? (
                 <p className="text-left text-xs text-amber-700 dark:text-amber-200/90">
                   OTP is available for +91 only right now.
                 </p>
@@ -301,7 +324,7 @@ export function LoginPage() {
               <p className="text-left text-xs text-slate-500 dark:text-slate-400">
                 Code sent to{' '}
                 <span className="text-slate-900 dark:text-slate-50">
-                  {trimmedPhone}
+                  {displayPhone}
                 </span>
                 <button
                   type="button"
