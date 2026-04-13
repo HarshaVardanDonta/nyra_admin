@@ -19,6 +19,38 @@ import {
   useMsg91WidgetServerProxy,
 } from '../lib/msg91-widget'
 
+const COUNTRIES = [
+  { dial: '+91', label: '+91 (IN)' },
+  { dial: '+1', label: '+1 (US)' },
+  { dial: '+44', label: '+44 (UK)' },
+] as const
+
+function ChevronDownIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      xmlns="http://www.w3.org/2000/svg"
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d="m6 9 6 6 6-6" />
+    </svg>
+  )
+}
+
+function normalizeIndiaLocalPhone(digits: string): string | null {
+  const d = digits.replace(/\D/g, '')
+  if (d.length !== 10 || !/^[6-9]/.test(d)) return null
+  return d
+}
+
 function BrandMark() {
   return (
     <div className="flex items-center justify-center gap-2.5">
@@ -53,7 +85,8 @@ export function LoginPage() {
   const navigate = useNavigate()
   const widgetMode = useMsg91WidgetLogin()
   const [widgetReady, setWidgetReady] = useState(!widgetMode)
-  const [phone, setPhone] = useState('')
+  const [country, setCountry] = useState<string>('+91')
+  const [phoneInput, setPhoneInput] = useState('')
   const [otp, setOtp] = useState('')
   const [requestId, setRequestId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -98,12 +131,24 @@ export function LoginPage() {
 
   const showOtpStep = Boolean(requestId)
 
+  const localDigits = phoneInput.replace(/\D/g, '')
+  const canSendOtp =
+    country === '+91' &&
+    localDigits.length === 10 &&
+    /^[6-9]/.test(localDigits) &&
+    !loading &&
+    !(widgetMode && !widgetReady)
+
   async function handleSendOtp(e: FormEvent) {
     e.preventDefault()
     setError(null)
-    const trimmed = phone.trim()
-    if (!trimmed) {
-      setError('Enter your phone number')
+    if (country !== '+91') {
+      setError('OTP is available for +91 only right now.')
+      return
+    }
+    const local = normalizeIndiaLocalPhone(phoneInput)
+    if (!local) {
+      setError('Enter a valid 10-digit Indian mobile number')
       return
     }
     if (widgetMode && !widgetReady) {
@@ -113,7 +158,7 @@ export function LoginPage() {
     setLoading(true)
     try {
       if (widgetMode) {
-        const identifier = toMsg91MobileIdentifier(trimmed)
+        const identifier = toMsg91MobileIdentifier(local)
         if (!identifier) {
           setError('Enter a valid Indian mobile number (10 digits or +91…)')
           return
@@ -122,7 +167,7 @@ export function LoginPage() {
         setRequestId(req)
         setOtp('')
       } else {
-        const { request_id } = await sendOtp(trimmed)
+        const { request_id } = await sendOtp(local)
         setRequestId(request_id)
         setOtp('')
       }
@@ -136,10 +181,14 @@ export function LoginPage() {
   async function handleVerify(e: FormEvent) {
     e.preventDefault()
     setError(null)
-    const trimmedPhone = phone.trim()
     const trimmedOtp = otp.trim()
+    const localPhone = normalizeIndiaLocalPhone(phoneInput)
     if (!requestId || !trimmedOtp) {
       setError('Enter the code we sent you')
+      return
+    }
+    if (!localPhone) {
+      setError('Enter a valid 10-digit Indian mobile number')
       return
     }
     setLoading(true)
@@ -152,7 +201,7 @@ export function LoginPage() {
         navigate('/dashboard', { replace: true })
       } else {
         const { token, refresh_token } = await verifyAdminOtp({
-          phone: trimmedPhone,
+          phone: localPhone,
           otp: trimmedOtp,
           request_id: requestId,
         })
@@ -186,6 +235,11 @@ export function LoginPage() {
     setOtp('')
     setError(null)
   }
+
+  const displayPhone =
+    localDigits.length === 10
+      ? `+91 ${localDigits.slice(0, 5)} ${localDigits.slice(5)}`
+      : `+91 ${localDigits}`
 
   return (
     <div className="relative h-full min-h-0 overflow-y-auto overscroll-y-contain bg-[radial-gradient(ellipse_80%_50%_at_50%_-20%,rgba(37,99,235,0.08),transparent),rgb(241_245_249)] dark:bg-[radial-gradient(ellipse_80%_50%_at_50%_-20%,rgba(37,99,235,0.12),transparent),rgb(11_17_32)]">
@@ -240,27 +294,57 @@ export function LoginPage() {
 
           {!showOtpStep ? (
             <form onSubmit={handleSendOtp} className="flex flex-col gap-4">
-              <div className="text-left">
+              <div className="w-full min-w-0">
                 <label
                   htmlFor="phone"
-                  className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400"
+                  className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-400"
                 >
-                  Phone
+                  Phone number
                 </label>
-                <input
-                  id="phone"
-                  name="phone"
-                  type="tel"
-                  autoComplete="tel"
-                  value={phone}
-                  onChange={(ev) => setPhone(ev.target.value)}
-                  placeholder="+919876543210"
-                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-500 focus:border-blue-600 focus:ring-4 focus:ring-blue-500/20 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-50 dark:placeholder:text-slate-400 dark:focus:border-blue-500"
-                />
+                <div className="flex w-full min-w-0 flex-nowrap items-stretch gap-4">
+                  <div className="relative w-fit max-w-[min(100%,11rem)] shrink-0">
+                    <select
+                      id="country"
+                      name="country"
+                      value={country}
+                      onChange={(ev) => setCountry(ev.target.value)}
+                      aria-label="Country code"
+                      className="block w-max min-w-0 max-w-full appearance-none rounded-2xl border border-slate-200 bg-slate-50 py-3.5 pl-4 pr-10 text-sm font-medium text-ink focus:border-brand-deep focus:outline-none focus:ring-2 focus:ring-brand-deep/20 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-50 dark:focus:border-brand-deep dark:focus:ring-brand-deep/30"
+                    >
+                      {COUNTRIES.map((c) => (
+                        <option key={c.dial} value={c.dial}>
+                          {c.label}
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDownIcon className="pointer-events-none absolute right-3 top-1/2 size-[18px] -translate-y-1/2 text-slate-400" />
+                  </div>
+                  <input
+                    id="phone"
+                    name="phone"
+                    type="tel"
+                    inputMode="numeric"
+                    autoComplete="tel"
+                    maxLength={10}
+                    value={phoneInput}
+                    onChange={(ev) =>
+                      setPhoneInput(
+                        ev.target.value.replace(/\D/g, '').slice(0, 10),
+                      )
+                    }
+                    placeholder="98765 43210"
+                    className="min-w-0 flex-1 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3.5 text-sm text-ink placeholder:text-slate-400 focus:border-brand-deep focus:outline-none focus:ring-2 focus:ring-brand-deep/20 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-50 dark:placeholder:text-slate-400 dark:focus:border-brand-deep dark:focus:ring-brand-deep/30"
+                  />
+                </div>
               </div>
+              {country !== '+91' ? (
+                <p className="text-left text-xs text-amber-700 dark:text-amber-200/90">
+                  OTP is available for +91 only right now.
+                </p>
+              ) : null}
               <button
                 type="submit"
-                disabled={loading || (widgetMode && !widgetReady)}
+                disabled={!canSendOtp}
                 className="w-full rounded-lg bg-blue-600 py-2.5 text-sm font-medium text-white transition hover:bg-blue-700 disabled:opacity-60"
               >
                 {loading ? 'Sending…' : 'Send OTP'}
@@ -271,7 +355,7 @@ export function LoginPage() {
               <p className="text-left text-xs text-slate-500 dark:text-slate-400">
                 Code sent to{' '}
                 <span className="text-slate-900 dark:text-slate-50">
-                  {phone.trim()}
+                  {displayPhone}
                 </span>
                 <button
                   type="button"
@@ -296,7 +380,7 @@ export function LoginPage() {
               <div className="text-left">
                 <label
                   htmlFor="otp"
-                  className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400"
+                  className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-400"
                 >
                   One-time code
                 </label>
@@ -309,7 +393,7 @@ export function LoginPage() {
                   value={otp}
                   onChange={(ev) => setOtp(ev.target.value)}
                   placeholder="Enter OTP"
-                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-500 focus:border-blue-600 focus:ring-4 focus:ring-blue-500/20 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-50 dark:placeholder:text-slate-400 dark:focus:border-blue-500"
+                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3.5 text-sm text-ink placeholder:text-slate-400 focus:border-brand-deep focus:outline-none focus:ring-2 focus:ring-brand-deep/20 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-50 dark:placeholder:text-slate-400 dark:focus:border-brand-deep dark:focus:ring-brand-deep/30"
                 />
               </div>
               <button

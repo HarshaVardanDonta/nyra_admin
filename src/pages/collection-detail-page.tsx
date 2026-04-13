@@ -466,7 +466,9 @@ export function CollectionDetailPage() {
               <h3 className="font-semibold">Performance</h3>
             </div>
             <p className="mt-1 text-xs text-slate-600">
-              Illustrative metrics for UI preview (not live analytics yet).
+              Last 30 days vs prior 30 days (trend %). Views = storefront page loads; sales =
+              paid order lines for products in this collection; conversion = paid orders touching
+              those products / views (not last-touch attribution).
             </p>
             {analytics ? (
               <div className="mt-4 grid grid-cols-2 gap-4">
