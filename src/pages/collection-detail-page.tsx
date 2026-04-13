@@ -148,7 +148,7 @@ export function CollectionDetailPage() {
 
   if (loading || !collection) {
     return (
-      <div className="flex min-h-[50vh] items-center justify-center bg-[#0b0e14] text-sm text-slate-500">
+      <div className="flex min-h-[50vh] items-center justify-center bg-slate-50 text-sm text-slate-500 dark:bg-[#0b0e14] dark:text-slate-400">
         {loading ? 'Loading…' : 'Collection not found.'}
       </div>
     )
@@ -159,9 +159,9 @@ export function CollectionDetailPage() {
   const seg = collectionSlugSegment(collection.slug)
 
   return (
-    <div className="bg-[#0b0e14] min-w-0 px-4 pt-6 pb-28 text-slate-200 sm:px-6 lg:p-10">
-      <nav className="mb-6 text-sm text-slate-500">
-        <Link to="/collections" className="hover:text-blue-400">
+    <div className="min-w-0 bg-slate-50 px-4 pt-6 pb-28 text-slate-900 dark:bg-[#0b0e14] dark:text-slate-200 sm:px-6 lg:p-10">
+      <nav className="mb-6 text-sm text-slate-500 dark:text-slate-500">
+        <Link to="/collections" className="hover:text-blue-600 dark:hover:text-blue-400">
           Collections
         </Link>
         <span className="mx-2">/</span>
@@ -170,7 +170,9 @@ export function CollectionDetailPage() {
 
       <div className="mb-8 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="flex flex-wrap items-center gap-3">
-          <h1 className="text-2xl font-semibold tracking-tight text-white">{collection.name}</h1>
+          <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-white">
+            {collection.name}
+          </h1>
           {published ? (
             <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/40 bg-emerald-500/10 px-2.5 py-0.5 text-xs font-medium text-emerald-400">
               <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
@@ -190,7 +192,7 @@ export function CollectionDetailPage() {
         <div className="flex flex-wrap gap-2">
           <Link
             to={`/collections/${encodeURIComponent(collection.id)}/edit`}
-            className="inline-flex items-center gap-2 rounded-lg border border-slate-700 bg-[#151b23] px-4 py-2 text-sm font-medium text-slate-200 transition hover:border-slate-600"
+            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-800 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-[#151b23] dark:text-slate-200 dark:hover:border-slate-600 dark:hover:bg-slate-800/40"
           >
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.75} stroke="currentColor">
               <path
@@ -221,7 +223,7 @@ export function CollectionDetailPage() {
 
       <div className="grid min-w-0 gap-6 lg:grid-cols-[1fr_340px]">
         <section className="min-w-0 space-y-6">
-          <div className="overflow-hidden rounded-xl border border-slate-800 bg-[#151b23] shadow-xl">
+          <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-[#151b23] dark:shadow-xl">
             <div
               className={`relative flex min-h-[200px] flex-col justify-end bg-gradient-to-br from-slate-800 to-slate-900 p-8 ${
                 banner ? '' : ''
@@ -240,23 +242,27 @@ export function CollectionDetailPage() {
                 <h2 className="mt-1 text-2xl font-semibold text-white">{collection.name}</h2>
               </div>
             </div>
-            <div className="border-t border-slate-800 p-6">
+            <div className="border-t border-slate-200 p-6 dark:border-slate-800">
               <p className="text-[10px] font-semibold uppercase tracking-widest text-blue-400/90">Description</p>
               {collection.description ? (
-                <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-slate-300">
+                <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-slate-700 dark:text-slate-300">
                   {collection.description}
                 </p>
               ) : (
                 <p className="mt-2 text-sm text-slate-500">No description.</p>
               )}
-              <div className="mt-6 grid gap-4 border-t border-slate-800 pt-6 sm:grid-cols-2">
+              <div className="mt-6 grid gap-4 border-t border-slate-200 pt-6 dark:border-slate-800 sm:grid-cols-2">
                 <div>
                   <p className="text-xs font-medium uppercase tracking-wider text-slate-500">Created</p>
-                  <p className="mt-1 text-sm text-slate-200">{formatDate(collection.createdAt)}</p>
+                  <p className="mt-1 text-sm text-slate-900 dark:text-slate-200">
+                    {formatDate(collection.createdAt)}
+                  </p>
                 </div>
                 <div>
                   <p className="text-xs font-medium uppercase tracking-wider text-slate-500">Total products</p>
-                  <p className="mt-1 text-sm text-slate-200">{collection.products.length} items</p>
+                  <p className="mt-1 text-sm text-slate-900 dark:text-slate-200">
+                    {collection.products.length} items
+                  </p>
                 </div>
                 <div className="sm:col-span-2">
                   <p className="text-xs font-medium uppercase tracking-wider text-slate-500">Slug</p>
@@ -266,10 +272,12 @@ export function CollectionDetailPage() {
             </div>
           </div>
 
-          <div className="overflow-hidden rounded-xl border border-slate-800 bg-[#151b23] shadow-xl">
-            <div className="flex flex-col gap-4 border-b border-slate-800 p-5 sm:flex-row sm:items-center sm:justify-between">
+          <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-[#151b23] dark:shadow-xl">
+            <div className="flex flex-col gap-4 border-b border-slate-200 p-5 dark:border-slate-800 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <h3 className="text-lg font-semibold text-white">Products in collection</h3>
+                <h3 className="text-lg font-semibold text-slate-900 dark:text-white">
+                  Products in collection
+                </h3>
                 <p className="text-sm text-slate-500">{collection.products.length} total items</p>
               </div>
               <div className="flex flex-wrap gap-2">
@@ -288,7 +296,7 @@ export function CollectionDetailPage() {
                     value={productSearch}
                     onChange={(e) => setProductSearch(e.target.value)}
                     placeholder="Search items…"
-                    className="w-full rounded-lg border border-slate-700 bg-[#0f1419] py-2.5 pl-10 pr-3 text-sm text-slate-200 placeholder:text-slate-600 focus:border-blue-500 focus:outline-none"
+                    className="w-full rounded-lg border border-slate-200 bg-white py-2.5 pl-10 pr-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none dark:border-slate-700 dark:bg-[#0f1419] dark:text-slate-200 dark:placeholder:text-slate-600"
                   />
                 </label>
                 <Link
@@ -324,10 +332,10 @@ export function CollectionDetailPage() {
                       const stock = p.stockQuantity ?? 0
                       const catLabel = categoryBreadcrumb(categories, p.categoryId)
                       return (
-                        <tr key={p.id} className="hover:bg-slate-800/30">
+                        <tr key={p.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/30">
                           <td className="px-5 py-4">
                             <div className="flex items-center gap-3">
-                              <div className="h-11 w-11 shrink-0 overflow-hidden rounded-lg bg-slate-800">
+                              <div className="h-11 w-11 shrink-0 overflow-hidden rounded-lg bg-slate-100 dark:bg-slate-800">
                                 {thumb ? (
                                   <img src={thumb} alt="" className="h-full w-full object-cover" />
                                 ) : (
@@ -337,13 +345,15 @@ export function CollectionDetailPage() {
                                 )}
                               </div>
                               <div className="min-w-0">
-                                <p className="font-medium text-white">{p.name}</p>
+                                <p className="font-medium text-slate-900 dark:text-white">{p.name}</p>
                                 <p className="truncate text-xs text-slate-500">{catLabel}</p>
                               </div>
                             </div>
                           </td>
                           <td className="px-5 py-4 font-mono text-xs text-slate-400">{p.sku ?? '—'}</td>
-                          <td className="px-5 py-4 text-slate-200">{formatInr(p.basePrice)}</td>
+                          <td className="px-5 py-4 text-slate-900 dark:text-slate-200">
+                            {formatInr(p.basePrice)}
+                          </td>
                           <td className="px-5 py-4">
                             <div className="flex items-center gap-3">
                               <div className="h-2 w-24 overflow-hidden rounded-full bg-slate-800">
@@ -362,7 +372,7 @@ export function CollectionDetailPage() {
                           <td className="px-5 py-4 text-right">
                             <Link
                               to={`/products/${encodeURIComponent(p.id)}/edit`}
-                              className="inline-flex rounded-lg p-2 text-slate-500 hover:bg-slate-800 hover:text-slate-200"
+                              className="inline-flex rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-900 dark:hover:bg-slate-800 dark:hover:text-slate-200"
                               title="Edit product"
                             >
                               <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
@@ -381,7 +391,7 @@ export function CollectionDetailPage() {
                 </tbody>
               </table>
             </div>
-            <div className="flex flex-col items-center justify-between gap-3 border-t border-slate-800 px-5 py-4 text-sm text-slate-500 sm:flex-row">
+            <div className="flex flex-col items-center justify-between gap-3 border-t border-slate-200 px-5 py-4 text-sm text-slate-600 dark:border-slate-800 dark:text-slate-500 sm:flex-row">
               <p className="tabular-nums">
                 Showing {filteredProducts.length ? (productPage - 1) * perPage + 1 : 0}–
                 {Math.min(productPage * perPage, filteredProducts.length)} of {filteredProducts.length} products
@@ -391,7 +401,7 @@ export function CollectionDetailPage() {
                   type="button"
                   disabled={productPage <= 1}
                   onClick={() => setProductPage((x) => Math.max(1, x - 1))}
-                  className="rounded-lg border border-slate-700 px-3 py-1.5 text-xs disabled:opacity-40"
+                  className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs disabled:opacity-40 dark:border-slate-700"
                 >
                   Previous
                 </button>
@@ -402,7 +412,7 @@ export function CollectionDetailPage() {
                   type="button"
                   disabled={productPage >= productPages}
                   onClick={() => setProductPage((x) => x + 1)}
-                  className="rounded-lg border border-slate-700 px-3 py-1.5 text-xs disabled:opacity-40"
+                  className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs disabled:opacity-40 dark:border-slate-700"
                 >
                   Next
                 </button>
@@ -412,8 +422,8 @@ export function CollectionDetailPage() {
         </section>
 
         <aside className="min-w-0 space-y-6">
-          <div className="rounded-xl border border-slate-800 bg-[#151b23] p-5 shadow-xl">
-            <div className="flex items-center gap-2 text-white">
+          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-[#151b23] dark:shadow-xl">
+            <div className="flex items-center gap-2 text-slate-900 dark:text-white">
               <svg className="h-5 w-5 text-blue-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                 <path
@@ -458,47 +468,35 @@ export function CollectionDetailPage() {
             </button>
           </div>
 
-          <div className="rounded-xl border border-slate-800 bg-[#151b23] p-5 shadow-xl">
-            <div className="flex items-center gap-2 text-white">
+          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-[#151b23] dark:shadow-xl">
+            <div className="flex items-center gap-2 text-slate-900 dark:text-white">
               <svg className="h-5 w-5 text-blue-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M4 19V5M9 19v-6m5 6V9m5 10V4" />
               </svg>
               <h3 className="font-semibold">Performance</h3>
             </div>
-            <p className="mt-1 text-xs text-slate-600">
-              Last 30 days vs prior 30 days (trend %). Views = storefront page loads; sales =
-              paid order lines for products in this collection; conversion = paid orders touching
-              those products / views (not last-touch attribution).
-            </p>
             {analytics ? (
               <div className="mt-4 grid grid-cols-2 gap-4">
-                <div className="rounded-lg bg-[#0f1419] p-3">
+                <div className="rounded-lg bg-slate-50 p-3 dark:bg-[#0f1419]">
                   <p className="text-xs text-slate-500">Views</p>
-                  <p className="mt-1 text-lg font-semibold text-white">{formatCompact(analytics.views)}</p>
+                  <p className="mt-1 text-lg font-semibold text-slate-900 dark:text-white">
+                    {formatCompact(analytics.views)}
+                  </p>
                   <p className="text-xs text-emerald-400">+{analytics.viewsTrendPercent}%</p>
                 </div>
-                <div className="rounded-lg bg-[#0f1419] p-3">
+                <div className="rounded-lg bg-slate-50 p-3 dark:bg-[#0f1419]">
                   <p className="text-xs text-slate-500">Sales</p>
-                  <p className="mt-1 text-lg font-semibold text-white">
+                  <p className="mt-1 text-lg font-semibold text-slate-900 dark:text-white">
                     {formatInr(analytics.salesCents / 100)}
                   </p>
                   <p className="text-xs text-emerald-400">+{analytics.salesTrendPercent}%</p>
                 </div>
-                <div className="col-span-2 rounded-lg bg-[#0f1419] p-3">
+                <div className="col-span-2 rounded-lg bg-slate-50 p-3 dark:bg-[#0f1419]">
                   <p className="text-xs text-slate-500">Conversion rate</p>
                   <div className="mt-2 flex items-end gap-2">
-                    <p className="text-2xl font-semibold text-white">
+                    <p className="text-2xl font-semibold text-slate-900 dark:text-white">
                       {analytics.conversionRatePercent.toFixed(1)}%
                     </p>
-                    <div className="mb-1 flex h-8 flex-1 items-end gap-0.5">
-                      {[40, 65, 45, 80, 55, 90, 70].map((h, i) => (
-                        <div
-                          key={i}
-                          className="flex-1 rounded-sm bg-blue-600/70"
-                          style={{ height: `${h}%` }}
-                        />
-                      ))}
-                    </div>
                   </div>
                 </div>
               </div>

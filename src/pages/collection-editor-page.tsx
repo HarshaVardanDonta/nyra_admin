@@ -57,7 +57,10 @@ function Toggle({
     <div className="flex items-center justify-between gap-3">
       <div>
         {label ? (
-          <label htmlFor={id} className="text-sm font-medium text-slate-200">
+          <label
+            htmlFor={id}
+            className="text-sm font-medium text-slate-700 dark:text-slate-200"
+          >
             {label}
           </label>
         ) : null}
@@ -105,10 +108,12 @@ function FileDrop({
 }) {
   return (
     <div>
-      <p className="mb-2 text-sm font-medium text-slate-200">{label}</p>
+      <p className="mb-2 text-sm font-medium text-slate-700 dark:text-slate-200">
+        {label}
+      </p>
       <label
         htmlFor={id}
-        className={`flex cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-slate-600 bg-[#0f1419] px-4 text-center transition hover:border-blue-500/50 ${
+        className={`flex cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 text-center transition hover:border-blue-500/50 dark:border-slate-600 dark:bg-[#0f1419] ${
           tall ? 'min-h-[140px] py-12' : 'py-10'
         }`}
       >
@@ -125,7 +130,7 @@ function FileDrop({
             </svg>
           </span>
         )}
-        <span className="text-sm font-medium text-slate-300">
+        <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
           {file ? file.name : 'Click to upload or drag and drop'}
         </span>
         <span className="mt-1 text-xs text-slate-500">{hint}</span>
@@ -406,16 +411,16 @@ export function CollectionEditorPage() {
 
   if (loading) {
     return (
-      <div className="flex min-h-[50vh] items-center justify-center bg-[#0b0e14] text-slate-500">
+      <div className="flex min-h-[50vh] items-center justify-center bg-slate-50 text-slate-500 dark:bg-[#0b0e14] dark:text-slate-400">
         Loading…
       </div>
     )
   }
 
   return (
-    <div className="bg-[#0b0e14] min-w-0 px-4 pt-6 pb-32 text-slate-200 sm:px-6 lg:p-10">
-      <nav className="mb-6 text-sm text-slate-500">
-        <Link to="/collections" className="hover:text-blue-400">
+    <div className="min-w-0 bg-slate-50 px-4 pt-6 pb-32 text-slate-900 dark:bg-[#0b0e14] dark:text-slate-200 sm:px-6 lg:p-10">
+      <nav className="mb-6 text-sm text-slate-500 dark:text-slate-500">
+        <Link to="/collections" className="hover:text-blue-600 dark:hover:text-blue-400">
           Collections
         </Link>
         <span className="mx-2">/</span>
@@ -423,13 +428,13 @@ export function CollectionEditorPage() {
       </nav>
 
       <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <h1 className="text-2xl font-semibold text-white">
+        <h1 className="text-2xl font-semibold text-slate-900 dark:text-white">
           {isEdit ? 'Edit collection' : 'Create collection'}
         </h1>
         <div className="flex flex-wrap gap-2">
           <Link
             to={isEdit && collectionId ? `/collections/${encodeURIComponent(collectionId)}` : '/collections'}
-            className="rounded-lg border border-slate-700 bg-[#151b23] px-4 py-2 text-sm font-medium text-slate-300 hover:border-slate-600"
+            className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-[#151b23] dark:text-slate-300 dark:hover:border-slate-600 dark:hover:bg-slate-800/40"
           >
             Cancel
           </Link>
@@ -446,27 +451,31 @@ export function CollectionEditorPage() {
 
       <div className="min-w-0 grid gap-8 lg:grid-cols-[1fr_320px]">
         <div className="space-y-6">
-          <section className="rounded-xl border border-slate-800 bg-[#151b23] p-6 shadow-xl">
+          <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-[#151b23] dark:shadow-xl">
             <div className="mb-4 flex items-center gap-2 text-blue-400">
               <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M12 20a8 8 0 100-16 8 8 0 000 16z" />
               </svg>
-              <h2 className="text-lg font-semibold text-white">Basic information</h2>
+              <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Basic information</h2>
             </div>
             <div className="space-y-4">
               <div>
-                <label className="mb-1.5 block text-sm font-medium text-slate-300">Collection name</label>
+                <label className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-300">
+                  Collection name
+                </label>
                 <input
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="e.g. Summer Essentials"
-                  className="w-full rounded-lg border border-slate-700 bg-[#0f1419] px-3 py-2.5 text-sm text-white placeholder:text-slate-600 focus:border-blue-500 focus:outline-none"
+                  className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none dark:border-slate-700 dark:bg-[#0f1419] dark:text-white dark:placeholder:text-slate-600"
                 />
               </div>
               <div>
-                <label className="mb-1.5 block text-sm font-medium text-slate-300">Slug</label>
-                <div className="flex rounded-lg border border-slate-700 bg-[#0f1419] focus-within:border-blue-500">
-                  <span className="flex items-center border-r border-slate-700 px-3 text-xs text-slate-500">
+                <label className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-300">
+                  Slug
+                </label>
+                <div className="flex rounded-lg border border-slate-200 bg-white focus-within:border-blue-500 dark:border-slate-700 dark:bg-[#0f1419]">
+                  <span className="flex items-center border-r border-slate-200 px-3 text-xs text-slate-500 dark:border-slate-700">
                     /collections/
                   </span>
                   <input
@@ -475,31 +484,33 @@ export function CollectionEditorPage() {
                       setSlugTouched(true)
                       setSlugSegment(e.target.value)
                     }}
-                    className="min-w-0 flex-1 bg-transparent px-3 py-2.5 text-sm text-white outline-none"
+                    className="min-w-0 flex-1 bg-transparent px-3 py-2.5 text-sm text-slate-900 outline-none dark:text-white"
                     placeholder="summer-essentials"
                   />
                 </div>
               </div>
               <div>
-                <label className="mb-1.5 block text-sm font-medium text-slate-300">Description</label>
+                <label className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-300">
+                  Description
+                </label>
                 <textarea
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   rows={5}
                   placeholder="Describe this collection for your customers…"
-                  className="w-full rounded-lg border border-slate-700 bg-[#0f1419] px-3 py-2.5 text-sm text-white placeholder:text-slate-600 focus:border-blue-500 focus:outline-none"
+                  className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none dark:border-slate-700 dark:bg-[#0f1419] dark:text-white dark:placeholder:text-slate-600"
                 />
               </div>
             </div>
           </section>
 
-          <section className="rounded-xl border border-slate-800 bg-[#151b23] p-6 shadow-xl">
+          <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-[#151b23] dark:shadow-xl">
             <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-center gap-2 text-blue-400">
                 <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
                 </svg>
-                <h2 className="text-lg font-semibold text-white">Product selection</h2>
+                <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Product selection</h2>
               </div>
               <button
                 type="button"
@@ -523,13 +534,13 @@ export function CollectionEditorPage() {
               <input
                 readOnly
                 placeholder="Use Add products to search the catalog…"
-                className="w-full cursor-default rounded-lg border border-slate-700 bg-[#0f1419] py-2.5 pl-10 pr-3 text-sm text-slate-500"
+                className="w-full cursor-default rounded-lg border border-slate-200 bg-slate-50 py-2.5 pl-10 pr-3 text-sm text-slate-500 dark:border-slate-700 dark:bg-[#0f1419]"
               />
             </label>
-            <div className="overflow-x-auto rounded-lg border border-slate-800">
+            <div className="overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-800">
               <table className="w-full min-w-[600px] text-left text-sm">
                 <thead>
-                  <tr className="border-b border-slate-800 bg-[#0f1419] text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                  <tr className="border-b border-slate-200 bg-slate-50 text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:border-slate-800 dark:bg-[#0f1419]">
                     <th className="px-4 py-3">Product</th>
                     <th className="px-4 py-3">SKU</th>
                     <th className="px-4 py-3">Price</th>
@@ -537,7 +548,7 @@ export function CollectionEditorPage() {
                     <th className="px-4 py-3 text-right">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-800">
+                <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
                   {products.length === 0 ? (
                     <tr>
                       <td colSpan={5} className="px-4 py-10 text-center text-slate-500">
@@ -550,16 +561,16 @@ export function CollectionEditorPage() {
                       const stock = p.stockQuantity ?? 0
                       const oos = p.isOutOfStock || stock <= 0
                       return (
-                        <tr key={p.id} className="hover:bg-slate-800/40">
+                        <tr key={p.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
                           <td className="px-4 py-3">
                             <div className="flex items-center gap-3">
-                              <div className="h-10 w-10 shrink-0 overflow-hidden rounded-lg bg-slate-800">
+                              <div className="h-10 w-10 shrink-0 overflow-hidden rounded-lg bg-slate-100 dark:bg-slate-800">
                                 {thumb ? (
                                   <img src={thumb} alt="" className="h-full w-full object-cover" />
                                 ) : null}
                               </div>
                               <div className="min-w-0">
-                                <p className="font-medium text-white">{p.name}</p>
+                                <p className="font-medium text-slate-900 dark:text-white">{p.name}</p>
                                 <p className="truncate text-xs text-slate-500">
                                   {categoryBreadcrumb(categories, p.categoryId)}
                                 </p>
@@ -600,8 +611,8 @@ export function CollectionEditorPage() {
         </div>
 
         <aside className="space-y-6">
-          <section className="rounded-xl border border-slate-800 bg-[#151b23] p-5 shadow-xl">
-            <div className="mb-4 flex items-center gap-2 text-slate-200">
+          <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-[#151b23] dark:shadow-xl">
+            <div className="mb-4 flex items-center gap-2 text-slate-900 dark:text-slate-200">
               <svg className="h-5 w-5 text-blue-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
               </svg>
@@ -630,8 +641,8 @@ export function CollectionEditorPage() {
             </div>
           </section>
 
-          <section className="rounded-xl border border-slate-800 bg-[#151b23] p-5 shadow-xl">
-            <div className="mb-4 flex items-center gap-2 text-slate-200">
+          <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-[#151b23] dark:shadow-xl">
+            <div className="mb-4 flex items-center gap-2 text-slate-900 dark:text-slate-200">
               <svg className="h-5 w-5 text-blue-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M3 12l9-9 9 9M4.5 10.5V21h15V10.5" />
               </svg>
@@ -645,23 +656,25 @@ export function CollectionEditorPage() {
               sub="Show this collection as a scrollable row on the homepage."
             />
             <div className="mt-5">
-              <label className="mb-1.5 block text-sm font-medium text-slate-300">Display priority</label>
+              <label className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-300">
+                Display priority
+              </label>
               <input
                 type="number"
                 min={0}
                 max={999}
                 value={displayPriority}
                 onChange={(e) => setDisplayPriority(Number(e.target.value))}
-                className="w-full rounded-lg border border-slate-700 bg-[#0f1419] px-3 py-2 text-sm text-white focus:border-blue-500 focus:outline-none"
+                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:outline-none dark:border-slate-700 dark:bg-[#0f1419] dark:text-white"
               />
               <p className="mt-1 text-xs text-slate-500">Lower numbers appear first.</p>
             </div>
           </section>
 
-          <section className="rounded-xl border border-slate-800 bg-[#151b23] p-5 shadow-xl">
+          <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-[#151b23] dark:shadow-xl">
             <p className="mb-3 text-[10px] font-semibold uppercase tracking-widest text-blue-400">Status</p>
             <div className="space-y-3">
-              <label className="flex cursor-pointer gap-3 rounded-lg border border-slate-800 p-3 hover:border-slate-700">
+              <label className="flex cursor-pointer gap-3 rounded-lg border border-slate-200 p-3 hover:border-slate-300 dark:border-slate-800 dark:hover:border-slate-700">
                 <input
                   type="radio"
                   name="cstatus"
@@ -670,11 +683,11 @@ export function CollectionEditorPage() {
                   className="mt-1"
                 />
                 <div>
-                  <p className="font-medium text-white">Published</p>
+                  <p className="font-medium text-slate-900 dark:text-white">Published</p>
                   <p className="text-xs text-slate-500">Visible to all customers.</p>
                 </div>
               </label>
-              <label className="flex cursor-pointer gap-3 rounded-lg border border-slate-800 p-3 hover:border-slate-700">
+              <label className="flex cursor-pointer gap-3 rounded-lg border border-slate-200 p-3 hover:border-slate-300 dark:border-slate-800 dark:hover:border-slate-700">
                 <input
                   type="radio"
                   name="cstatus"
@@ -683,7 +696,7 @@ export function CollectionEditorPage() {
                   className="mt-1"
                 />
                 <div>
-                  <p className="font-medium text-white">Draft</p>
+                  <p className="font-medium text-slate-900 dark:text-white">Draft</p>
                   <p className="text-xs text-slate-500">Only visible to administrators.</p>
                 </div>
               </label>
@@ -699,7 +712,7 @@ export function CollectionEditorPage() {
           aria-modal
           aria-label="Add products"
         >
-          <div className="max-h-[85vh] w-full max-w-lg overflow-hidden rounded-xl border border-slate-800 bg-[#151b23] shadow-2xl">
+          <div className="max-h-[85vh] w-full max-w-lg overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-[#151b23]">
             <div className="flex items-center justify-between border-b border-slate-800 px-4 py-3">
               <h3 className="font-semibold text-white">Add products</h3>
               <button
@@ -715,7 +728,7 @@ export function CollectionEditorPage() {
                 value={pickerSearch}
                 onChange={(e) => setPickerSearch(e.target.value)}
                 placeholder="Search by name, SKU or ID…"
-                className="w-full rounded-lg border border-slate-700 bg-[#0f1419] px-3 py-2.5 text-sm text-white placeholder:text-slate-600 focus:border-blue-500 focus:outline-none"
+                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none dark:border-slate-700 dark:bg-[#0f1419] dark:text-white dark:placeholder:text-slate-600"
               />
             </div>
             <div className="max-h-[50vh] overflow-y-auto border-t border-slate-800">
