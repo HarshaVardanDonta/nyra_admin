@@ -310,14 +310,45 @@ export async function fetchCatalogProductByKey(productKey: string): Promise<Cata
   return normalizeCatalogProductRow(raw)
 }
 
+export async function fetchProductByKey(
+  token: string | null,
+  productKey: string,
+): Promise<CatalogProductRow> {
+  const key = productKey.trim()
+  if (token && key.startsWith('prd_')) {
+    const encoded = encodeURIComponent(key)
+    const raw = await request<unknown>(`/api/v1/products/${encoded}`, { method: 'GET', token })
+    return normalizeCatalogProductRow(raw)
+  }
+  return fetchCatalogProductByKey(key)
+}
+
 /**
  * `GET /api/v1/catalog/products` only (Postman public catalog). Admin catalog documents `POST` / `PATCH`
  * for products, not a list endpoint — filtering by publication is applied client-side when the API ignores those query params.
  */
 export async function fetchProductsList(
-  _token: string | null,
+  token: string | null,
   params: CatalogProductListParams,
 ): Promise<{ items: CatalogProductRow[]; total: number }> {
+  if (token) {
+    const q = new URLSearchParams({
+      limit: String(params.limit),
+      offset: String(params.offset),
+    })
+    if (params.categoryId) q.set('categoryId', params.categoryId)
+    if (params.brandId) q.set('brandId', params.brandId)
+    if (params.search) q.set('search', params.search)
+    if (params.publication && params.publication !== 'all') q.set('publication', params.publication)
+
+    const raw = await request<unknown>(`/api/v1/products?${q}`, { method: 'GET', token })
+    const rawItems = arrayFromPayload(raw, ['items', 'products', 'data'])
+    const items = rawItems.map((row) => normalizeCatalogProductRow(row))
+    const total = totalFromPayload(raw, items.length)
+    return { items, total }
+  }
+
+  // Signed-out fallback: public catalog (published storefront only).
   const { items, total } = await fetchCatalogProducts(params)
   const pub = params.publication ?? 'all'
   if (pub === 'all') return { items, total }

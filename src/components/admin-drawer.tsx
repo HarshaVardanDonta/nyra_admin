@@ -345,6 +345,8 @@ export function AdminDrawer({
           />
           <NavRow to="/blogs" label="Blogs" icon="document" collapsed={collapsed} />
           <NavRow to="/blog-promotions" label="Blog promotions" icon="layout" collapsed={collapsed} />
+          <NavRow to="/faqs" label="FAQs" icon="document" collapsed={collapsed} />
+          <NavRow to="/hazards" label="Hazards" icon="document" collapsed={collapsed} />
         </NavGroup>
         <NavGroup title="System" collapsed={collapsed}>
           <NavRow to="/delivery-pincode-rules" label="Delivery pincodes" icon="truck" collapsed={collapsed} />

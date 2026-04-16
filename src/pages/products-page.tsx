@@ -85,6 +85,7 @@ export function ProductsPage() {
 
   const [brands, setBrands] = useState<CatalogBrand[]>([])
   const [categories, setCategories] = useState<CatalogCategory[]>([])
+  const brandNameById = useMemo(() => new Map(brands.map((b) => [b.id, b.name])), [brands])
   /** Full current result set (one server page, or up to 100 rows when stock/discount filters apply). */
   const [fullRows, setFullRows] = useState<CatalogProductRow[]>([])
   const [total, setTotal] = useState(0)
@@ -560,7 +561,7 @@ export function ProductsPage() {
                       </td>
                       <td className="px-4 py-3 align-middle text-slate-600 dark:text-slate-300">
                         <p className="font-medium text-slate-800 dark:text-slate-200">
-                          {row.brand?.name ?? '—'}
+                          {row.brand?.name ?? (row.brandId ? brandNameById.get(row.brandId) : undefined) ?? '—'}
                         </p>
                         <p className="text-xs text-slate-500 dark:text-slate-400">
                           {categoryBreadcrumb(categories, row.category?.id ?? row.categoryId)}
@@ -615,8 +616,8 @@ export function ProductsPage() {
                         <div className="inline-flex justify-end gap-1">
                           <button
                             type="button"
-                            title="View / Edit"
-                            onClick={() => navigate(`/products/${encodeURIComponent(row.id)}/edit`)}
+                            title="View"
+                            onClick={() => navigate(`/products/${encodeURIComponent(row.id)}`)}
                             className="rounded-lg p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 dark:hover:bg-slate-800 dark:hover:text-slate-100"
                           >
                             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.75} stroke="currentColor">

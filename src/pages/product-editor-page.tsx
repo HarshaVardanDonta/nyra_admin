@@ -5,11 +5,19 @@ import { useToast } from '../contexts/use-toast'
 import {
   fetchCatalogBrands,
   fetchCatalogCategories,
-  fetchCatalogProductByKey,
+  fetchProductByKey,
   type CatalogBrand,
   type CatalogCategory,
   type CatalogProductRow,
 } from '../lib/api/catalog'
+import {
+  fetchFAQs,
+  fetchProductFAQs,
+  putProductFAQs,
+  type FAQ,
+  type ProductFAQWriteItem,
+} from '../lib/api/faqs'
+import { fetchHazards, type Hazard } from '../lib/api/hazards'
 import {
   createProduct,
   normalizeProductMediaForApi,
@@ -302,6 +310,19 @@ export function ProductEditorPage() {
   const [existingMedia, setExistingMedia] = useState<unknown[]>([])
   const [existingThumb, setExistingThumb] = useState('')
 
+  const [hazards, setHazards] = useState<Hazard[]>([])
+  const [hazardsLoading, setHazardsLoading] = useState(false)
+
+  const [faqBank, setFaqBank] = useState<FAQ[]>([])
+  const [faqLoading, setFaqLoading] = useState(false)
+  const [faqSearch, setFaqSearch] = useState('')
+  const [productFaqs, setProductFaqs] = useState<
+    (
+      | { kind: 'universal'; faqId: string }
+      | { kind: 'custom'; id: string; question: string; answer: string }
+    )[]
+  >([])
+
   const loadMeta = useCallback(async () => {
     const [b, c] = await Promise.all([fetchCatalogBrands(), fetchCatalogCategories()])
     setBrands(b)
@@ -313,13 +334,51 @@ export function ProductEditorPage() {
   }, [loadMeta, showApiError])
 
   useEffect(() => {
+    if (!token) return
+    let cancelled = false
+    ;(async () => {
+      setFaqLoading(true)
+      try {
+        const { faqs } = await fetchFAQs(token, { limit: 500, offset: 0 })
+        if (!cancelled) setFaqBank(faqs)
+      } catch (e) {
+        if (!cancelled) showApiError(e)
+      } finally {
+        if (!cancelled) setFaqLoading(false)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [token, showApiError])
+
+  useEffect(() => {
+    if (!token) return
+    let cancelled = false
+    ;(async () => {
+      setHazardsLoading(true)
+      try {
+        const { hazards } = await fetchHazards(token, { limit: 500, offset: 0 })
+        if (!cancelled) setHazards(hazards)
+      } catch (e) {
+        if (!cancelled) showApiError(e)
+      } finally {
+        if (!cancelled) setHazardsLoading(false)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [token, showApiError])
+
+  useEffect(() => {
     const key = dupId ?? productId
     if (!key) return
     let cancelled = false
     ;(async () => {
       setLoading(true)
       try {
-        const p = await fetchCatalogProductByKey(key)
+        const p = await fetchProductByKey(token, key)
         if (cancelled) return
         const f = mapProductToForm(p)
         setName(dupId ? `${f.name} (copy)` : f.name)
@@ -354,6 +413,29 @@ export function ProductEditorPage() {
         setTaxRows(f.taxRows)
         setExistingMedia(Array.isArray(p.media) ? p.media : [])
         setExistingThumb(p.thumbnailUrl ? resolveMediaUrl(p.thumbnailUrl) : '')
+
+        if (token && key.startsWith('prd_')) {
+          try {
+            const { items } = await fetchProductFAQs(token, key)
+            if (!cancelled) {
+              const mapped: ({ kind: 'universal'; faqId: string } | { kind: 'custom'; id: string; question: string; answer: string })[] =
+                items.map((it, i) => {
+                  if (it.faqId) return { kind: 'universal', faqId: it.faqId }
+                  return {
+                    kind: 'custom',
+                    id: `${baseId}-pf-${i}`,
+                    question: it.question ?? '',
+                    answer: it.answer ?? '',
+                  }
+                })
+              setProductFaqs(mapped)
+            }
+          } catch (e) {
+            if (!cancelled) showApiError(e)
+          }
+        } else if (!cancelled) {
+          setProductFaqs([])
+        }
       } catch (e) {
         if (!cancelled) showApiError(e)
       } finally {
@@ -363,7 +445,7 @@ export function ProductEditorPage() {
     return () => {
       cancelled = true
     }
-  }, [productId, dupId, showApiError])
+  }, [productId, dupId, token, baseId, showApiError])
 
   useEffect(() => {
     if (!slug && name) setSlug(slugify(name))
@@ -546,6 +628,49 @@ export function ProductEditorPage() {
     return variantPriceAdjustmentErrorMessage(baseRupees, discountRupees, payload)
   }, [variantsEnabled, variants, basePriceRupees, discountPriceRupees])
 
+  const attachedUniversalFAQIDs = useMemo(() => {
+    return new Set(productFaqs.filter((x) => x.kind === 'universal').map((x) => x.faqId))
+  }, [productFaqs])
+
+  const filteredFAQBank = useMemo(() => {
+    const q = faqSearch.trim().toLowerCase()
+    if (!q) return faqBank
+    return faqBank.filter((f) => {
+      return f.question.toLowerCase().includes(q) || f.answer.toLowerCase().includes(q)
+    })
+  }, [faqBank, faqSearch])
+
+  function toggleUniversalFAQ(faqId: string) {
+    setProductFaqs((prev) => {
+      const idx = prev.findIndex((x) => x.kind === 'universal' && x.faqId === faqId)
+      if (idx >= 0) return prev.filter((_, i) => i !== idx)
+      return [...prev, { kind: 'universal', faqId }]
+    })
+  }
+
+  function addCustomFAQ() {
+    setProductFaqs((prev) => [
+      ...prev,
+      { kind: 'custom', id: `${baseId}-cfaq-${Date.now()}`, question: '', answer: '' },
+    ])
+  }
+
+  function moveFAQ(from: number, dir: -1 | 1) {
+    setProductFaqs((prev) => {
+      const to = from + dir
+      if (from < 0 || from >= prev.length || to < 0 || to >= prev.length) return prev
+      const next = [...prev]
+      const tmp = next[from]
+      next[from] = next[to]
+      next[to] = tmp
+      return next
+    })
+  }
+
+  function removeFAQ(index: number) {
+    setProductFaqs((prev) => prev.filter((_, i) => i !== index))
+  }
+
   async function handleSubmit(mode: 'draft' | 'publish') {
     if (!token) {
       showToast('Sign in again to continue.', 'error')
@@ -591,14 +716,24 @@ export function ProductEditorPage() {
     const published = mode === 'publish'
     setSaving(true)
     try {
+      const productFaqPayload: ProductFAQWriteItem[] = productFaqs.map((it) => {
+        if (it.kind === 'universal') return { faqId: it.faqId }
+        return { question: it.question, answer: it.answer }
+      })
+
       if (isEdit && productId) {
         // Multipart only: this backend matches the working Postman/curl flow; JSON PATCH can fail silently.
         await updateProduct(token, productId, buildProductFormData(published))
+        await putProductFAQs(token, productId, productFaqPayload)
         showToast(published ? 'Product published' : 'Draft saved', 'success')
         navigate('/products')
       } else {
         const fd = buildProductFormData(published)
-        await createProduct(token, fd)
+        const created = await createProduct(token, fd)
+        const newId = typeof created?.id === 'string' ? created.id : ''
+        if (newId) {
+          await putProductFAQs(token, newId, productFaqPayload)
+        }
         showToast(published ? 'Product published' : 'Draft saved', 'success')
         navigate('/products')
       }
@@ -679,6 +814,131 @@ export function ProductEditorPage() {
                     rows={6}
                     className="mt-1 w-full resize-y rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/25 dark:border-slate-700 dark:bg-[#0f1419]"
                   />
+                </div>
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <div className="sm:col-span-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <label className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                        Composition
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setDescDoc((d) => {
+                            const texts = [...(d.composition?.texts ?? [])]
+                            texts.push('')
+                            return {
+                              ...d,
+                              composition: {
+                                ...(d.composition ?? { texts: [], hazardKey: '' }),
+                                texts,
+                              },
+                            }
+                          })
+                        }
+                        className="text-xs font-medium text-blue-600 hover:text-blue-500 dark:text-blue-400"
+                      >
+                        + Add line
+                      </button>
+                    </div>
+                    <div className="mt-1 space-y-2">
+                      {(descDoc.composition?.texts?.length ? descDoc.composition.texts : ['']).map((t, i) => (
+                        <div key={i} className="flex items-center gap-2">
+                          <input
+                            value={t}
+                            onChange={(e) =>
+                              setDescDoc((d) => {
+                                const base =
+                                  d.composition?.texts?.length ? [...d.composition.texts] : ['']
+                                base[i] = e.target.value
+                                return {
+                                  ...d,
+                                  composition: {
+                                    ...(d.composition ?? { texts: [], hazardKey: '' }),
+                                    texts: base,
+                                  },
+                                }
+                              })
+                            }
+                            placeholder="e.g. Chlorantraniliprole 18.50% SC"
+                            className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900"
+                          />
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setDescDoc((d) => {
+                                const base =
+                                  d.composition?.texts?.length ? [...d.composition.texts] : ['']
+                                const texts = base.filter((_, j) => j !== i)
+                                return {
+                                  ...d,
+                                  composition: {
+                                    ...(d.composition ?? { texts: [], hazardKey: '' }),
+                                    texts,
+                                  },
+                                }
+                              })
+                            }
+                            className="shrink-0 text-xs font-medium text-red-600 hover:underline dark:text-red-400"
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                      Hazard
+                    </label>
+                    <select
+                      value={descDoc.composition?.hazardKey ?? ''}
+                      onChange={(e) =>
+                        setDescDoc((d) => ({
+                          ...d,
+                          composition: {
+                            ...(d.composition ?? { texts: [], hazardKey: '' }),
+                            hazardKey: e.target.value,
+                          },
+                        }))
+                      }
+                      className="select-tail mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900"
+                      disabled={hazardsLoading}
+                    >
+                      <option value="">None</option>
+                      {descDoc.composition?.hazardKey &&
+                      !hazards.some((h) => h.key === descDoc.composition?.hazardKey) ? (
+                        <option value={descDoc.composition?.hazardKey}>
+                          Unknown ({descDoc.composition?.hazardKey})
+                        </option>
+                      ) : null}
+                      {hazards
+                        .filter((h) => h.isActive)
+                        .sort((a, b) => a.label.localeCompare(b.label))
+                        .map((h) => (
+                          <option key={h.id} value={h.key}>
+                            {h.label}
+                          </option>
+                        ))}
+                    </select>
+                    {descDoc.composition?.hazardKey ? (
+                      <div className="mt-2 flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+                        <span
+                          className="inline-block h-4 w-4 rounded border border-slate-200 dark:border-slate-700"
+                          style={{
+                            backgroundColor:
+                              hazards.find((h) => h.key === descDoc.composition?.hazardKey)?.color ??
+                              'transparent',
+                          }}
+                          aria-hidden
+                        />
+                        <span className="truncate">
+                          {hazards.find((h) => h.key === descDoc.composition?.hazardKey)?.label ??
+                            descDoc.composition?.hazardKey}
+                        </span>
+                      </div>
+                    ) : null}
+                  </div>
                 </div>
                 <div>
                   <div className="flex items-center justify-between gap-2">
@@ -941,6 +1201,176 @@ export function ProductEditorPage() {
                       </option>
                     ))}
                   </select>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-[#0f1419]">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">FAQs</h2>
+                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                  Append universal FAQs and add custom product-specific FAQs. Product FAQs show first, then universal.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={addCustomFAQ}
+                className="shrink-0 rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white hover:bg-blue-500"
+              >
+                + Custom FAQ
+              </button>
+            </div>
+
+            <div className="mt-4 grid gap-4 lg:grid-cols-2">
+              <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-4 dark:border-slate-800 dark:bg-slate-900/40">
+                <div className="flex items-center justify-between gap-2">
+                  <label className="text-xs font-semibold text-slate-700 dark:text-slate-200">
+                    Universal FAQ bank
+                  </label>
+                  <span className="text-[11px] text-slate-500 dark:text-slate-400">
+                    {faqLoading ? 'Loading…' : `${faqBank.length} total`}
+                  </span>
+                </div>
+                <input
+                  value={faqSearch}
+                  onChange={(e) => setFaqSearch(e.target.value)}
+                  placeholder="Search FAQs…"
+                  className="mt-2 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900"
+                />
+                <div className="mt-3 max-h-[320px] overflow-y-auto pr-1">
+                  {filteredFAQBank.length === 0 ? (
+                    <div className="rounded-lg border border-dashed border-slate-300 p-3 text-xs text-slate-500 dark:border-slate-700 dark:text-slate-400">
+                      No FAQs match your search.
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {filteredFAQBank.map((f) => {
+                        const checked = attachedUniversalFAQIDs.has(f.id)
+                        return (
+                          <label
+                            key={f.id}
+                            className={[
+                              'flex cursor-pointer items-start gap-3 rounded-lg border px-3 py-2 transition',
+                              checked
+                                ? 'border-blue-500/40 bg-blue-600/5'
+                                : 'border-slate-200 bg-white hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900/60 dark:hover:bg-slate-900',
+                            ].join(' ')}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              onChange={() => toggleUniversalFAQ(f.id)}
+                              className="mt-1"
+                            />
+                            <div className="min-w-0">
+                              <div className="truncate text-sm font-medium text-slate-900 dark:text-slate-50">
+                                {f.question}
+                              </div>
+                              <div className="mt-1 line-clamp-2 whitespace-pre-wrap text-xs text-slate-500 dark:text-slate-400">
+                                {f.answer}
+                              </div>
+                              {!f.isPublished ? (
+                                <div className="mt-1 text-[11px] font-medium text-amber-700 dark:text-amber-300">
+                                  Draft (won’t show on storefront)
+                                </div>
+                              ) : null}
+                            </div>
+                          </label>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-[#0b1220]">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="text-xs font-semibold text-slate-700 dark:text-slate-200">
+                    Appended to this product
+                  </div>
+                  <div className="text-[11px] text-slate-500 dark:text-slate-400">{productFaqs.length} items</div>
+                </div>
+                <div className="mt-3 space-y-3">
+                  {productFaqs.length === 0 ? (
+                    <div className="rounded-lg border border-dashed border-slate-300 p-3 text-xs text-slate-500 dark:border-slate-700 dark:text-slate-400">
+                      Nothing appended yet.
+                    </div>
+                  ) : (
+                    productFaqs.map((it, i) => (
+                      <div
+                        key={it.kind === 'universal' ? it.faqId : it.id}
+                        className="rounded-lg border border-slate-200 p-3 dark:border-slate-700"
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                            {it.kind === 'universal' ? 'Universal' : 'Custom'} · #{i + 1}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => moveFAQ(i, -1)}
+                              className="rounded border border-slate-200 px-2 py-1 text-[11px] text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-900"
+                              title="Move up"
+                            >
+                              ↑
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => moveFAQ(i, 1)}
+                              className="rounded border border-slate-200 px-2 py-1 text-[11px] text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-900"
+                              title="Move down"
+                            >
+                              ↓
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => removeFAQ(i)}
+                              className="rounded border border-red-200 px-2 py-1 text-[11px] text-red-600 hover:bg-red-50 dark:border-red-900/40 dark:text-red-300 dark:hover:bg-red-950/30"
+                              title="Remove"
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        </div>
+
+                        {it.kind === 'universal' ? (
+                          <div className="mt-2 text-sm text-slate-700 dark:text-slate-200">
+                            {faqBank.find((f) => f.id === it.faqId)?.question ?? it.faqId}
+                          </div>
+                        ) : (
+                          <div className="mt-2 space-y-2">
+                            <input
+                              value={it.question}
+                              onChange={(e) =>
+                                setProductFaqs((prev) =>
+                                  prev.map((x, j) =>
+                                    j === i && x.kind === 'custom' ? { ...x, question: e.target.value } : x,
+                                  ),
+                                )
+                              }
+                              placeholder="Question"
+                              className="w-full rounded border border-slate-200 bg-white px-2 py-1.5 text-sm dark:border-slate-700 dark:bg-slate-900"
+                            />
+                            <textarea
+                              value={it.answer}
+                              onChange={(e) =>
+                                setProductFaqs((prev) =>
+                                  prev.map((x, j) =>
+                                    j === i && x.kind === 'custom' ? { ...x, answer: e.target.value } : x,
+                                  ),
+                                )
+                              }
+                              placeholder="Answer"
+                              rows={3}
+                              className="w-full resize-y rounded border border-slate-200 bg-white px-2 py-1.5 text-sm dark:border-slate-700 dark:bg-slate-900"
+                            />
+                          </div>
+                        )}
+                      </div>
+                    ))
+                  )}
                 </div>
               </div>
             </div>
