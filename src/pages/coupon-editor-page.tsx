@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useState, type FormEvent, type ReactNode } from 'react'
+import { useCallback, useEffect, useId, useMemo, useState, type FormEvent, type ReactNode } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useAuth } from '../contexts/use-auth'
 import { useToast } from '../contexts/use-toast'
@@ -8,8 +8,15 @@ import {
   generateCouponCodePreview,
   updateCoupon,
   type CouponDiscountType,
+  type CouponRecord,
   type CouponWriteInput,
 } from '../lib/api/coupons'
+import {
+  fetchCatalogCategories,
+  fetchProductsList,
+  type CatalogCategory,
+  type CatalogProductRow,
+} from '../lib/api/catalog'
 import { AdminDateTimeField } from '../components/admin-date-field'
 import { datetimeLocalToIso, isoToDatetimeLocal } from '../lib/datetime-local'
 
@@ -40,33 +47,25 @@ const defaultForm = (): CouponWriteInput => ({
   usagePerCustomer: 1,
   startDate: undefined,
   expirationDate: undefined,
+  excludedCategoryIds: [],
+  excludedProductIds: [],
 })
 
-function recordToForm(
-  code: string,
-  description: string,
-  isActive: boolean,
-  discountType: CouponDiscountType,
-  discountValue: number,
-  minimumOrderValue: number,
-  maximumDiscount: number | undefined,
-  totalUsageLimit: number | undefined,
-  usagePerCustomer: number,
-  startDate: string | undefined,
-  expirationDate: string | undefined,
-): CouponWriteInput {
+function couponRecordToWriteInput(c: CouponRecord): CouponWriteInput {
   return {
-    code,
-    description,
-    isActive,
-    discountType,
-    discountValue,
-    minimumOrderValue,
-    maximumDiscount,
-    totalUsageLimit,
-    usagePerCustomer,
-    startDate,
-    expirationDate,
+    code: c.code,
+    description: c.description,
+    isActive: c.isActive,
+    discountType: c.discountType === 'fixed' ? 'fixed' : 'percentage',
+    discountValue: c.discountValue,
+    minimumOrderValue: c.minimumOrderValue,
+    maximumDiscount: c.maximumDiscount,
+    totalUsageLimit: c.totalUsageLimit,
+    usagePerCustomer: c.usagePerCustomer,
+    startDate: c.startDate,
+    expirationDate: c.expirationDate,
+    excludedCategoryIds: [...(c.excludedCategoryIds ?? [])],
+    excludedProductIds: [...(c.excludedProductIds ?? [])],
   }
 }
 
@@ -169,6 +168,21 @@ export function CouponEditorPage() {
   const [usagePerCustomerStr, setUsagePerCustomerStr] = useState('1')
   const [startLocal, setStartLocal] = useState('')
   const [endLocal, setEndLocal] = useState('')
+  const [excludedCategoryIds, setExcludedCategoryIds] = useState<string[]>([])
+  const [excludedProductIds, setExcludedProductIds] = useState<string[]>([])
+  const [catalogCategories, setCatalogCategories] = useState<CatalogCategory[]>([])
+  const [productSearch, setProductSearch] = useState('')
+  const [productHits, setProductHits] = useState<CatalogProductRow[]>([])
+  const [productSearchLoading, setProductSearchLoading] = useState(false)
+  const [productLabels, setProductLabels] = useState<Record<string, string>>({})
+
+  const categoryNameById = useMemo(() => {
+    const m = new Map<string, string>()
+    for (const c of catalogCategories) {
+      m.set(c.id, c.name)
+    }
+    return m
+  }, [catalogCategories])
 
   const applyLoaded = useCallback((input: CouponWriteInput, startL: string, endL: string) => {
     setCode(input.code)
@@ -192,6 +206,8 @@ export function CouponEditorPage() {
     setUsagePerCustomerStr(String(Math.max(1, input.usagePerCustomer)))
     setStartLocal(startL)
     setEndLocal(endL)
+    setExcludedCategoryIds([...(input.excludedCategoryIds ?? [])])
+    setExcludedProductIds([...(input.excludedProductIds ?? [])])
   }, [])
 
   const loadEdit = useCallback(async () => {
@@ -199,26 +215,66 @@ export function CouponEditorPage() {
     setLoading(true)
     try {
       const c = await fetchCouponDetail(token, couponId)
-      const input = recordToForm(
-        c.code,
-        c.description,
-        c.isActive,
-        c.discountType === 'fixed' ? 'fixed' : 'percentage',
-        c.discountValue,
-        c.minimumOrderValue,
-        c.maximumDiscount,
-        c.totalUsageLimit,
-        c.usagePerCustomer,
-        c.startDate,
-        c.expirationDate,
-      )
+      const input = couponRecordToWriteInput(c)
       applyLoaded(input, isoToDatetimeLocal(c.startDate), isoToDatetimeLocal(c.expirationDate))
+      const labels: Record<string, string> = {}
+      for (const pid of input.excludedProductIds ?? []) {
+        labels[pid] = pid
+      }
+      setProductLabels(labels)
     } catch (e) {
       showApiError(e)
     } finally {
       setLoading(false)
     }
   }, [couponId, token, showApiError, applyLoaded])
+
+  useEffect(() => {
+    if (!token) return
+    let cancelled = false
+    void fetchCatalogCategories()
+      .then((rows) => {
+        if (!cancelled) setCatalogCategories(rows)
+      })
+      .catch(() => {
+        if (!cancelled) setCatalogCategories([])
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [token])
+
+  useEffect(() => {
+    if (!token) return
+    const q = productSearch.trim()
+    if (q.length < 2) {
+      setProductHits([])
+      return
+    }
+    let cancelled = false
+    const t = window.setTimeout(() => {
+      setProductSearchLoading(true)
+      void fetchProductsList(token, {
+        limit: 20,
+        offset: 0,
+        search: q,
+        publication: 'all',
+      })
+        .then(({ items }) => {
+          if (!cancelled) setProductHits(items)
+        })
+        .catch(() => {
+          if (!cancelled) setProductHits([])
+        })
+        .finally(() => {
+          if (!cancelled) setProductSearchLoading(false)
+        })
+    }, 300)
+    return () => {
+      cancelled = true
+      window.clearTimeout(t)
+    }
+  }, [productSearch, token])
 
   useEffect(() => {
     if (isEdit) void loadEdit()
@@ -257,6 +313,8 @@ export function CouponEditorPage() {
       usagePerCustomer,
       startDate: datetimeLocalToIso(startLocal),
       expirationDate: datetimeLocalToIso(endLocal),
+      excludedCategoryIds,
+      excludedProductIds,
     }
   }
 
@@ -521,6 +579,133 @@ export function CouponEditorPage() {
                   className={inputClass()}
                 />
               </div>
+            </div>
+          </SectionCard>
+
+          <SectionCard
+            title="Exclusions"
+            description="Discount does not apply to cart lines in these categories (including subcategories) or these products."
+            icon={
+              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728L5.636 5.636m12.728 12.728L18.364 5.636M5.636 18.364l12.728-12.728"
+                />
+              </svg>
+            }
+          >
+            <div>
+              <p className="mb-2 text-xs font-medium text-slate-500 dark:text-slate-400">Excluded categories</p>
+              {excludedCategoryIds.length > 0 ? (
+                <div className="mb-3 flex flex-wrap gap-2">
+                  {excludedCategoryIds.map((id) => (
+                    <span
+                      key={id}
+                      className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs text-slate-800 dark:border-slate-600 dark:bg-[#0f1419] dark:text-slate-200"
+                    >
+                      {categoryNameById.get(id) ?? id}
+                      <button
+                        type="button"
+                        className="rounded p-0.5 text-slate-500 hover:text-red-600"
+                        aria-label="Remove"
+                        onClick={() =>
+                          setExcludedCategoryIds((prev) => prev.filter((x) => x !== id))
+                        }
+                      >
+                        ×
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <p className="mb-3 text-xs text-slate-500 dark:text-slate-400">None</p>
+              )}
+              <select
+                className={inputClass()}
+                defaultValue=""
+                onChange={(e) => {
+                  const v = e.target.value
+                  e.target.value = ''
+                  if (!v || excludedCategoryIds.includes(v)) return
+                  setExcludedCategoryIds((prev) => [...prev, v])
+                }}
+              >
+                <option value="">Add category…</option>
+                {catalogCategories
+                  .filter((c) => !excludedCategoryIds.includes(c.id))
+                  .map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+              </select>
+            </div>
+            <div>
+              <p className="mb-2 text-xs font-medium text-slate-500 dark:text-slate-400">Excluded products</p>
+              {excludedProductIds.length > 0 ? (
+                <div className="mb-3 flex flex-wrap gap-2">
+                  {excludedProductIds.map((id) => (
+                    <span
+                      key={id}
+                      className="inline-flex max-w-full items-center gap-1 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs text-slate-800 dark:border-slate-600 dark:bg-[#0f1419] dark:text-slate-200"
+                    >
+                      <span className="truncate">{productLabels[id] ?? id}</span>
+                      <button
+                        type="button"
+                        className="shrink-0 rounded p-0.5 text-slate-500 hover:text-red-600"
+                        aria-label="Remove"
+                        onClick={() => {
+                          setExcludedProductIds((prev) => prev.filter((x) => x !== id))
+                          setProductLabels((prev) => {
+                            const next = { ...prev }
+                            delete next[id]
+                            return next
+                          })
+                        }}
+                      >
+                        ×
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <p className="mb-3 text-xs text-slate-500 dark:text-slate-400">None</p>
+              )}
+              <input
+                type="search"
+                value={productSearch}
+                onChange={(e) => setProductSearch(e.target.value)}
+                placeholder="Search products (type 2+ characters)"
+                className={inputClass()}
+                autoComplete="off"
+              />
+              {productSearchLoading ? (
+                <p className="mt-2 text-xs text-slate-500">Searching…</p>
+              ) : productHits.length > 0 ? (
+                <ul className="mt-2 max-h-48 overflow-auto rounded-lg border border-slate-200 dark:border-slate-700">
+                  {productHits.map((p) => (
+                    <li key={p.id}>
+                      <button
+                        type="button"
+                        className="w-full px-3 py-2 text-left text-sm hover:bg-slate-50 dark:hover:bg-slate-800"
+                        onClick={() => {
+                          if (excludedProductIds.includes(p.id)) return
+                          setExcludedProductIds((prev) => [...prev, p.id])
+                          setProductLabels((prev) => ({ ...prev, [p.id]: p.name }))
+                          setProductSearch('')
+                          setProductHits([])
+                        }}
+                      >
+                        {p.name}
+                        <span className="ml-2 text-xs text-slate-500">{p.id}</span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              ) : productSearch.trim().length >= 2 ? (
+                <p className="mt-2 text-xs text-slate-500">No matches.</p>
+              ) : null}
             </div>
           </SectionCard>
 

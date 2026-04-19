@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useId, useMemo, useState } from 'react'
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
+import type { DragEvent } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { useAuth } from '../contexts/use-auth'
 import { useToast } from '../contexts/use-toast'
@@ -39,6 +40,32 @@ import {
   type ProductDescriptionV1,
 } from '../lib/productDescription'
 import { AdminDateField, AdminDateTimeField } from '../components/admin-date-field'
+
+const MAX_MEDIA_FILES = 10
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024
+
+type PendingProductMedia = {
+  id: string
+  file: File
+  objectUrl: string
+}
+
+function createPendingProductMedia(file: File): PendingProductMedia {
+  const id =
+    typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+      ? crypto.randomUUID()
+      : `pm-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`
+  return { id, file, objectUrl: URL.createObjectURL(file) }
+}
+
+/** Clone media row and set isPrimary (clears PascalCase duplicate for JSON). */
+function patchMediaItemPrimary(item: unknown, isPrimary: boolean): unknown {
+  if (!item || typeof item !== 'object') return item
+  const o = { ...(item as Record<string, unknown>) }
+  o.isPrimary = isPrimary
+  delete o.IsPrimary
+  return o
+}
 
 function slugify(s: string) {
   return s
@@ -261,6 +288,8 @@ export function ProductEditorPage() {
   const dupId = (location.state as { duplicateFromId?: string } | null)?.duplicateFromId
   const isEdit = Boolean(productId)
   const baseId = useId()
+  const mediaInputRef = useRef<HTMLInputElement>(null)
+  const pendingMediaRef = useRef<PendingProductMedia[]>([])
 
   const [brands, setBrands] = useState<CatalogBrand[]>([])
   const [categories, setCategories] = useState<CatalogCategory[]>([])
@@ -305,7 +334,7 @@ export function ProductEditorPage() {
     { id: 'a', label: 'CGST', percentStr: '9' },
     { id: 'b', label: 'SGST', percentStr: '9' },
   ])
-  const [mediaFiles, setMediaFiles] = useState<File[]>([])
+  const [pendingMedia, setPendingMedia] = useState<PendingProductMedia[]>([])
   const [mediaJsonInput, setMediaJsonInput] = useState('')
   const [existingMedia, setExistingMedia] = useState<unknown[]>([])
   const [existingThumb, setExistingThumb] = useState('')
@@ -322,6 +351,8 @@ export function ProductEditorPage() {
       | { kind: 'custom'; id: string; question: string; answer: string }
     )[]
   >([])
+
+  pendingMediaRef.current = pendingMedia
 
   const loadMeta = useCallback(async () => {
     const [b, c] = await Promise.all([fetchCatalogBrands(), fetchCatalogCategories()])
@@ -446,6 +477,23 @@ export function ProductEditorPage() {
       cancelled = true
     }
   }, [productId, dupId, token, baseId, showApiError])
+
+  useEffect(() => {
+    setPendingMedia((prev) => {
+      for (const p of prev) {
+        URL.revokeObjectURL(p.objectUrl)
+      }
+      return []
+    })
+  }, [productId, dupId])
+
+  useEffect(() => {
+    return () => {
+      for (const p of pendingMediaRef.current) {
+        URL.revokeObjectURL(p.objectUrl)
+      }
+    }
+  }, [])
 
   useEffect(() => {
     if (!slug && name) setSlug(slugify(name))
@@ -599,7 +647,7 @@ export function ProductEditorPage() {
     if (mergedMedia.length > 0) {
       fd.set('mediaJson', JSON.stringify(mergedMedia))
     }
-    for (const file of mediaFiles.slice(0, 10)) {
+    for (const { file } of pendingMedia.slice(0, MAX_MEDIA_FILES)) {
       fd.append('media', file)
     }
     if (productTaxOverride) {
@@ -748,6 +796,84 @@ export function ProductEditorPage() {
     name.trim() && brandId && categoryId && sku.trim() && buildSeo().slug,
   )
   const ready = baseReady && !variantPriceError
+
+  const addMediaFilesFromList = useCallback((files: File[]) => {
+    const next: PendingProductMedia[] = []
+    for (const f of files) {
+      if (!['image/png', 'image/jpeg', 'image/webp'].includes(f.type)) continue
+      if (f.size > MAX_IMAGE_BYTES) continue
+      next.push(createPendingProductMedia(f))
+    }
+    if (next.length === 0) return
+    setPendingMedia((prev) => {
+      const merged = [...prev, ...next]
+      if (merged.length <= MAX_MEDIA_FILES) return merged
+      const overflow = merged.slice(MAX_MEDIA_FILES)
+      for (const o of overflow) {
+        URL.revokeObjectURL(o.objectUrl)
+      }
+      return merged.slice(0, MAX_MEDIA_FILES)
+    })
+  }, [])
+
+  const removePendingMedia = useCallback((id: string) => {
+    setPendingMedia((prev) => {
+      const row = prev.find((p) => p.id === id)
+      if (row) URL.revokeObjectURL(row.objectUrl)
+      return prev.filter((p) => p.id !== id)
+    })
+  }, [])
+
+  const setExistingMediaPrimaryAt = useCallback((index: number) => {
+    setExistingMedia((prev) =>
+      prev.map((item, j) => {
+        const norm = normalizeProductMediaForApi([item])[0]
+        if (!norm) return item
+        if (norm.type.toLowerCase() === 'video') {
+          return patchMediaItemPrimary(item, false)
+        }
+        return patchMediaItemPrimary(item, j === index)
+      }),
+    )
+  }, [])
+
+  /** Clears primary on saved media and moves this upload first so the backend marks it primary (see multipart handler). */
+  const makePendingMediaPrimary = useCallback((id: string) => {
+    setExistingMedia((prev) => prev.map((item) => patchMediaItemPrimary(item, false)))
+    setPendingMedia((prev) => {
+      const idx = prev.findIndex((p) => p.id === id)
+      if (idx <= 0) return prev
+      const next = [...prev]
+      const [row] = next.splice(idx, 1)
+      next.unshift(row)
+      return next
+    })
+  }, [])
+
+  const openMediaPicker = useCallback(() => {
+    mediaInputRef.current?.click()
+  }, [])
+
+  const onMediaDragOver = useCallback((e: DragEvent<HTMLElement>) => {
+    e.preventDefault()
+    e.stopPropagation()
+  }, [])
+
+  const onMediaDrop = useCallback(
+    (e: DragEvent<HTMLElement>) => {
+      e.preventDefault()
+      e.stopPropagation()
+      const list = e.dataTransfer.files?.length ? [...e.dataTransfer.files] : []
+      addMediaFilesFromList(list)
+    },
+    [addMediaFilesFromList],
+  )
+
+  /** True when mediaJson already marks a saved item as primary (first new file is only primary if this is false). */
+  const existingJsonHasPrimary = useMemo(
+    () => normalizeProductMediaForApi(existingMedia).some((m) => m.isPrimary),
+    [existingMedia],
+  )
 
   if (loading) {
     return (
@@ -1381,20 +1507,32 @@ export function ProductEditorPage() {
               <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
                 Media &amp; gallery
               </h2>
-              <span className="text-xs text-slate-500 dark:text-slate-400">Max 10 images</span>
+              <span className="text-xs text-slate-500 dark:text-slate-400">
+                Max {MAX_MEDIA_FILES} new uploads per save
+              </span>
             </div>
-            <label className="mt-4 flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-slate-200 bg-slate-50/50 px-4 py-10 transition hover:border-blue-400/60 hover:bg-blue-50/30 dark:border-slate-700 dark:bg-slate-900/40 dark:hover:border-blue-500/40">
-              <input
-                type="file"
-                accept="image/png,image/jpeg,image/webp"
-                multiple
-                className="sr-only"
-                onChange={(e) => {
-                  const list = e.target.files ? [...e.target.files] : []
-                  setMediaFiles((prev) => [...prev, ...list].slice(0, 10))
-                }}
-              />
-              <svg className="mb-2 h-10 w-10 text-slate-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.25} stroke="currentColor">
+            <input
+              ref={mediaInputRef}
+              type="file"
+              accept="image/png,image/jpeg,image/webp"
+              multiple
+              tabIndex={-1}
+              className="sr-only"
+              aria-hidden
+              onChange={(e) => {
+                const list = e.target.files ? [...e.target.files] : []
+                addMediaFilesFromList(list)
+                e.target.value = ''
+              }}
+            />
+            <button
+              type="button"
+              onClick={openMediaPicker}
+              onDragOver={onMediaDragOver}
+              onDrop={onMediaDrop}
+              className="mt-4 flex w-full cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-slate-200 bg-slate-50/50 px-4 py-10 text-left transition hover:border-blue-400/60 hover:bg-blue-50/30 dark:border-slate-700 dark:bg-slate-900/40 dark:hover:border-blue-500/40"
+            >
+              <svg className="mb-2 h-10 w-10 text-slate-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.25} stroke="currentColor" aria-hidden>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
               </svg>
               <span className="text-sm font-medium text-slate-700 dark:text-slate-200">
@@ -1403,43 +1541,121 @@ export function ProductEditorPage() {
               <span className="mt-1 text-xs text-slate-500 dark:text-slate-400">
                 PNG, JPG or WebP (Max 5MB each)
               </span>
-            </label>
+            </button>
             <div className="mt-4 flex flex-wrap gap-2">
-              {existingThumb && !mediaFiles.length ? (
+              {existingMedia.map((item, i) => {
+                const norm = normalizeProductMediaForApi([item])[0]
+                if (!norm) return null
+                const src = resolveMediaUrl(norm.url)
+                const isVideo = norm.type.toLowerCase() === 'video'
+                return (
+                  <div
+                    key={`existing-${i}-${norm.url}`}
+                    className="relative h-20 w-20 overflow-hidden rounded-lg border border-slate-200 dark:border-slate-700"
+                  >
+                    {isVideo ? (
+                      <div className="flex h-full w-full items-center justify-center bg-slate-800 text-center text-[10px] font-medium text-white">
+                        Video
+                      </div>
+                    ) : (
+                      <img src={src} alt="" className="h-full w-full object-cover" />
+                    )}
+                    {norm.isPrimary ? (
+                      <span className="absolute left-1 top-1 rounded bg-blue-600 px-1 text-[9px] font-bold text-white">
+                        MAIN
+                      </span>
+                    ) : null}
+                    {!isVideo && !norm.isPrimary ? (
+                      <button
+                        type="button"
+                        className="absolute bottom-0 left-0 right-0 bg-black/65 py-0.5 text-[9px] font-semibold text-white hover:bg-black/80"
+                        onClick={(e) => {
+                          e.preventDefault()
+                          e.stopPropagation()
+                          setExistingMediaPrimaryAt(i)
+                        }}
+                      >
+                        Set main
+                      </button>
+                    ) : null}
+                    <button
+                      type="button"
+                      aria-label="Remove from gallery"
+                      className="absolute right-0.5 top-0.5 rounded bg-black/60 px-1.5 py-0.5 text-[11px] font-medium text-white hover:bg-black/75"
+                      onClick={(e) => {
+                        e.preventDefault()
+                        e.stopPropagation()
+                        setExistingMedia((m) => m.filter((_, j) => j !== i))
+                      }}
+                    >
+                      ×
+                    </button>
+                  </div>
+                )
+              })}
+              {existingMedia.length === 0 && existingThumb ? (
                 <div className="relative h-20 w-20 overflow-hidden rounded-lg border-2 border-blue-500/50">
                   <img src={existingThumb} alt="" className="h-full w-full object-cover" />
                   <span className="absolute left-1 top-1 rounded bg-blue-600 px-1 text-[9px] font-bold text-white">
                     MAIN
                   </span>
-                </div>
-              ) : null}
-              {mediaFiles.map((f, i) => (
-                <div
-                  key={`${f.name}-${i}`}
-                  className="relative h-20 w-20 overflow-hidden rounded-lg border border-slate-200 dark:border-slate-700"
-                >
-                  <img
-                    src={URL.createObjectURL(f)}
-                    alt=""
-                    className="h-full w-full object-cover"
-                  />
-                  {i === 0 ? (
-                    <span className="absolute left-1 top-1 rounded bg-blue-600 px-1 text-[9px] font-bold text-white">
-                      MAIN
-                    </span>
-                  ) : null}
                   <button
                     type="button"
-                    className="absolute right-0.5 top-0.5 rounded bg-black/60 px-1 text-[10px] text-white"
-                    onClick={() => setMediaFiles((m) => m.filter((_, j) => j !== i))}
+                    aria-label="Remove thumbnail"
+                    className="absolute right-0.5 top-0.5 rounded bg-black/60 px-1.5 py-0.5 text-[11px] font-medium text-white hover:bg-black/75"
+                    onClick={() => setExistingThumb('')}
                   >
                     ×
                   </button>
                 </div>
-              ))}
-              <div className="flex h-20 w-20 items-center justify-center rounded-lg border border-dashed border-slate-300 bg-slate-50 dark:border-slate-700 dark:bg-slate-900/60">
-                <span className="text-slate-400">+</span>
-              </div>
+              ) : null}
+              {pendingMedia.map((p, i) => {
+                const pendingIsMain = i === 0 && !existingJsonHasPrimary
+                return (
+                  <div
+                    key={p.id}
+                    className="relative h-20 w-20 overflow-hidden rounded-lg border border-slate-200 dark:border-slate-700"
+                  >
+                    <img
+                      src={p.objectUrl}
+                      alt=""
+                      className="h-full w-full object-cover"
+                    />
+                    {pendingIsMain ? (
+                      <span className="absolute left-1 top-1 rounded bg-blue-600 px-1 text-[9px] font-bold text-white">
+                        MAIN
+                      </span>
+                    ) : null}
+                    {!pendingIsMain ? (
+                      <button
+                        type="button"
+                        className="absolute bottom-0 left-0 right-0 bg-black/65 py-0.5 text-[9px] font-semibold text-white hover:bg-black/80"
+                        onClick={() => makePendingMediaPrimary(p.id)}
+                      >
+                        Set main
+                      </button>
+                    ) : null}
+                    <button
+                      type="button"
+                      aria-label="Remove image"
+                      className="absolute right-0.5 top-0.5 rounded bg-black/60 px-1.5 py-0.5 text-[11px] font-medium text-white hover:bg-black/75"
+                      onClick={() => removePendingMedia(p.id)}
+                    >
+                      ×
+                    </button>
+                  </div>
+                )
+              })}
+              {pendingMedia.length < MAX_MEDIA_FILES ? (
+                <button
+                  type="button"
+                  onClick={openMediaPicker}
+                  className="flex h-20 w-20 cursor-pointer items-center justify-center rounded-lg border border-dashed border-slate-300 bg-slate-50 text-slate-500 transition hover:border-blue-400/60 hover:bg-blue-50/40 hover:text-blue-600 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-400 dark:hover:border-blue-500/40 dark:hover:text-blue-400"
+                  aria-label="Add images"
+                >
+                  <span className="text-xl font-light leading-none">+</span>
+                </button>
+              ) : null}
             </div>
             <div className="mt-3">
               <label className="text-xs font-medium text-slate-500 dark:text-slate-400">
@@ -1826,7 +2042,7 @@ export function ProductEditorPage() {
         </div>
       </div>
 
-      <div className="fixed bottom-0 left-0 right-0 z-10 border-t border-slate-200 bg-white/95 px-4 py-3 backdrop-blur dark:border-slate-800 dark:bg-[#0a0c10]/95 lg:left-[260px]">
+      <div className="fixed inset-x-0 bottom-0 z-10 w-full border-t border-slate-200 bg-white/95 px-4 py-3 backdrop-blur dark:border-slate-800 dark:bg-[#0a0c10]/95">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-3">
           <button
             type="button"

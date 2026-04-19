@@ -379,3 +379,22 @@ export function categoryBreadcrumb(
   if (!parts.length && leaf) return leaf.name
   return parts.join(' › ') || '—'
 }
+
+/** All category ids in the subtree rooted at rootId (including root), for parent-picker exclusion. */
+export function catalogCategorySubtreeIds(rootId: string, categories: CatalogCategory[]): Set<string> {
+  const childrenByParent = new Map<string, string[]>()
+  for (const c of categories) {
+    const p = c.parentCategoryId?.trim() ?? ''
+    if (!childrenByParent.has(p)) childrenByParent.set(p, [])
+    childrenByParent.get(p)!.push(c.id)
+  }
+  const out = new Set<string>()
+  const q = [rootId]
+  while (q.length) {
+    const id = q.shift()!
+    if (out.has(id)) continue
+    out.add(id)
+    for (const kid of childrenByParent.get(id) ?? []) q.push(kid)
+  }
+  return out
+}

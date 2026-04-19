@@ -18,6 +18,8 @@ export type CouponRecord = {
   timesUsed: number
   startDate?: string
   expirationDate?: string
+  excludedCategoryIds?: string[]
+  excludedProductIds?: string[]
   createdAt: string
   updatedAt: string
 }
@@ -53,6 +55,19 @@ function isoish(v: unknown): string | undefined {
   return v
 }
 
+function pickStrArray(o: Record<string, unknown>, ...keys: string[]): string[] {
+  for (const k of keys) {
+    const v = o[k]
+    if (!Array.isArray(v)) continue
+    const out: string[] = []
+    for (const x of v) {
+      if (typeof x === 'string' && x.trim()) out.push(x.trim())
+    }
+    return out
+  }
+  return []
+}
+
 export function normalizeCoupon(raw: unknown): CouponRecord {
   if (!raw || typeof raw !== 'object') {
     return {
@@ -65,6 +80,8 @@ export function normalizeCoupon(raw: unknown): CouponRecord {
       minimumOrderValue: 0,
       usagePerCustomer: 1,
       timesUsed: 0,
+      excludedCategoryIds: [],
+      excludedProductIds: [],
       createdAt: '',
       updatedAt: '',
     }
@@ -85,6 +102,8 @@ export function normalizeCoupon(raw: unknown): CouponRecord {
     timesUsed: pickNum(o, 'timesUsed', 'times_used') ?? 0,
     startDate: isoish(o.startDate ?? o.StartDate),
     expirationDate: isoish(o.expirationDate ?? o.ExpirationDate),
+    excludedCategoryIds: pickStrArray(o, 'excludedCategoryIds', 'excluded_category_ids'),
+    excludedProductIds: pickStrArray(o, 'excludedProductIds', 'excluded_product_ids'),
     createdAt: pickStr(o, 'createdAt', 'created_at') ?? '',
     updatedAt: pickStr(o, 'updatedAt', 'updated_at') ?? '',
   }
@@ -175,6 +194,8 @@ export type CouponWriteInput = {
   usagePerCustomer: number
   startDate?: string
   expirationDate?: string
+  excludedCategoryIds?: string[]
+  excludedProductIds?: string[]
 }
 
 function buildCouponBody(input: CouponWriteInput, mode: 'create' | 'update'): Record<string, unknown> {
@@ -202,6 +223,8 @@ function buildCouponBody(input: CouponWriteInput, mode: 'create' | 'update'): Re
   }
   if (input.startDate) body.startDate = input.startDate
   if (input.expirationDate) body.expirationDate = input.expirationDate
+  body.excludedCategoryIds = input.excludedCategoryIds ?? []
+  body.excludedProductIds = input.excludedProductIds ?? []
   return body
 }
 
