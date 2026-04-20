@@ -102,6 +102,7 @@ export function OrderDetailPage() {
   const [refundOpen, setRefundOpen] = useState(false)
   const [refundNote, setRefundNote] = useState('')
   const [refundBusy, setRefundBusy] = useState(false)
+  const [notifySaving, setNotifySaving] = useState(false)
 
   const loadAll = useCallback(async () => {
     if (!Number.isFinite(orderId) || orderId <= 0) return
@@ -168,6 +169,23 @@ export function OrderDetailPage() {
   }, [detail?.order_summary.tax_rate])
 
   const taxBreakdownRows = detail?.order_summary.tax_breakdown ?? []
+
+  async function handleToggleNotifyCustomer(next: boolean) {
+    if (!detail) return
+    setNotifySaving(true)
+    try {
+      await updateOrder(token, orderId, { notify_customer_status_updates: next })
+      showToast(
+        next ? 'Customer will receive SMS/email on status updates.' : 'Customer notifications off for this order.',
+        'success',
+      )
+      await loadAll()
+    } catch (e) {
+      showApiError(e)
+    } finally {
+      setNotifySaving(false)
+    }
+  }
 
   async function handleSaveStatus() {
     if (!detail) return
@@ -381,6 +399,23 @@ export function OrderDetailPage() {
             className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-900"
             placeholder="e.g. handed to carrier…"
           />
+          <label className="mt-4 flex cursor-pointer items-start gap-3 rounded-lg border border-slate-200/80 bg-slate-50/80 p-3 dark:border-slate-600 dark:bg-slate-900/50">
+            <input
+              type="checkbox"
+              className="mt-0.5 h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 dark:border-slate-600 dark:bg-slate-900"
+              checked={order.notify_customer_status_updates}
+              disabled={notifySaving}
+              onChange={(e) => void handleToggleNotifyCustomer(e.target.checked)}
+            />
+            <span className="text-sm leading-snug">
+              <span className="font-medium text-slate-800 dark:text-slate-100">
+                Send customer SMS/email on status updates
+              </span>
+              <span className="mt-0.5 block text-xs text-slate-500 dark:text-slate-400">
+                Uses the shopper&apos;s phone (SMS) and email when present. Turn off for this order only.
+              </span>
+            </span>
+          </label>
           <button
             type="button"
             disabled={savingStatus}
