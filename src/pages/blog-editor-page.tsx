@@ -5,7 +5,7 @@ import { BlogEditorJs } from '../components/blog-editor-js'
 import { BlogLocalImagesProvider, useBlogLocalImages } from '../contexts/blog-local-images-context'
 import { useAuth } from '../contexts/use-auth'
 import { useToast } from '../contexts/use-toast'
-import { fetchCatalogProductByKey, fetchProductsList, type CatalogProductRow } from '../lib/api/catalog'
+import { fetchProductByKey, fetchProductsList, type CatalogProductRow } from '../lib/api/catalog'
 import {
   createBlog,
   fetchBlogDetail,
@@ -125,7 +125,7 @@ function BlogEditorPageInner() {
         const rows = await Promise.all(
           ids.map(async (id) => {
             try {
-              return await fetchCatalogProductByKey(id)
+              return await fetchProductByKey(token, id)
             } catch {
               return { id, name: id } as CatalogProductRow
             }

@@ -1,15 +1,24 @@
-import { useCallback, useEffect, useId, useMemo, useState } from 'react'
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
+import type { DragEvent } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { useAuth } from '../contexts/use-auth'
 import { useToast } from '../contexts/use-toast'
 import {
   fetchCatalogBrands,
   fetchCatalogCategories,
-  fetchCatalogProductByKey,
+  fetchProductByKey,
   type CatalogBrand,
   type CatalogCategory,
   type CatalogProductRow,
 } from '../lib/api/catalog'
+import {
+  fetchFAQs,
+  fetchProductFAQs,
+  putProductFAQs,
+  type FAQ,
+  type ProductFAQWriteItem,
+} from '../lib/api/faqs'
+import { fetchHazards, type Hazard } from '../lib/api/hazards'
 import {
   createProduct,
   normalizeProductMediaForApi,
@@ -31,6 +40,32 @@ import {
   type ProductDescriptionV1,
 } from '../lib/productDescription'
 import { AdminDateField, AdminDateTimeField } from '../components/admin-date-field'
+
+const MAX_MEDIA_FILES = 10
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024
+
+type PendingProductMedia = {
+  id: string
+  file: File
+  objectUrl: string
+}
+
+function createPendingProductMedia(file: File): PendingProductMedia {
+  const id =
+    typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+      ? crypto.randomUUID()
+      : `pm-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`
+  return { id, file, objectUrl: URL.createObjectURL(file) }
+}
+
+/** Clone media row and set isPrimary (clears PascalCase duplicate for JSON). */
+function patchMediaItemPrimary(item: unknown, isPrimary: boolean): unknown {
+  if (!item || typeof item !== 'object') return item
+  const o = { ...(item as Record<string, unknown>) }
+  o.isPrimary = isPrimary
+  delete o.IsPrimary
+  return o
+}
 
 function slugify(s: string) {
   return s
@@ -253,6 +288,8 @@ export function ProductEditorPage() {
   const dupId = (location.state as { duplicateFromId?: string } | null)?.duplicateFromId
   const isEdit = Boolean(productId)
   const baseId = useId()
+  const mediaInputRef = useRef<HTMLInputElement>(null)
+  const pendingMediaRef = useRef<PendingProductMedia[]>([])
 
   const [brands, setBrands] = useState<CatalogBrand[]>([])
   const [categories, setCategories] = useState<CatalogCategory[]>([])
@@ -297,10 +334,25 @@ export function ProductEditorPage() {
     { id: 'a', label: 'CGST', percentStr: '9' },
     { id: 'b', label: 'SGST', percentStr: '9' },
   ])
-  const [mediaFiles, setMediaFiles] = useState<File[]>([])
+  const [pendingMedia, setPendingMedia] = useState<PendingProductMedia[]>([])
   const [mediaJsonInput, setMediaJsonInput] = useState('')
   const [existingMedia, setExistingMedia] = useState<unknown[]>([])
   const [existingThumb, setExistingThumb] = useState('')
+
+  const [hazards, setHazards] = useState<Hazard[]>([])
+  const [hazardsLoading, setHazardsLoading] = useState(false)
+
+  const [faqBank, setFaqBank] = useState<FAQ[]>([])
+  const [faqLoading, setFaqLoading] = useState(false)
+  const [faqSearch, setFaqSearch] = useState('')
+  const [productFaqs, setProductFaqs] = useState<
+    (
+      | { kind: 'universal'; faqId: string }
+      | { kind: 'custom'; id: string; question: string; answer: string }
+    )[]
+  >([])
+
+  pendingMediaRef.current = pendingMedia
 
   const loadMeta = useCallback(async () => {
     const [b, c] = await Promise.all([fetchCatalogBrands(), fetchCatalogCategories()])
@@ -313,13 +365,51 @@ export function ProductEditorPage() {
   }, [loadMeta, showApiError])
 
   useEffect(() => {
+    if (!token) return
+    let cancelled = false
+    ;(async () => {
+      setFaqLoading(true)
+      try {
+        const { faqs } = await fetchFAQs(token, { limit: 500, offset: 0 })
+        if (!cancelled) setFaqBank(faqs)
+      } catch (e) {
+        if (!cancelled) showApiError(e)
+      } finally {
+        if (!cancelled) setFaqLoading(false)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [token, showApiError])
+
+  useEffect(() => {
+    if (!token) return
+    let cancelled = false
+    ;(async () => {
+      setHazardsLoading(true)
+      try {
+        const { hazards } = await fetchHazards(token, { limit: 500, offset: 0 })
+        if (!cancelled) setHazards(hazards)
+      } catch (e) {
+        if (!cancelled) showApiError(e)
+      } finally {
+        if (!cancelled) setHazardsLoading(false)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [token, showApiError])
+
+  useEffect(() => {
     const key = dupId ?? productId
     if (!key) return
     let cancelled = false
     ;(async () => {
       setLoading(true)
       try {
-        const p = await fetchCatalogProductByKey(key)
+        const p = await fetchProductByKey(token, key)
         if (cancelled) return
         const f = mapProductToForm(p)
         setName(dupId ? `${f.name} (copy)` : f.name)
@@ -354,6 +444,29 @@ export function ProductEditorPage() {
         setTaxRows(f.taxRows)
         setExistingMedia(Array.isArray(p.media) ? p.media : [])
         setExistingThumb(p.thumbnailUrl ? resolveMediaUrl(p.thumbnailUrl) : '')
+
+        if (token && key.startsWith('prd_')) {
+          try {
+            const { items } = await fetchProductFAQs(token, key)
+            if (!cancelled) {
+              const mapped: ({ kind: 'universal'; faqId: string } | { kind: 'custom'; id: string; question: string; answer: string })[] =
+                items.map((it, i) => {
+                  if (it.faqId) return { kind: 'universal', faqId: it.faqId }
+                  return {
+                    kind: 'custom',
+                    id: `${baseId}-pf-${i}`,
+                    question: it.question ?? '',
+                    answer: it.answer ?? '',
+                  }
+                })
+              setProductFaqs(mapped)
+            }
+          } catch (e) {
+            if (!cancelled) showApiError(e)
+          }
+        } else if (!cancelled) {
+          setProductFaqs([])
+        }
       } catch (e) {
         if (!cancelled) showApiError(e)
       } finally {
@@ -363,7 +476,24 @@ export function ProductEditorPage() {
     return () => {
       cancelled = true
     }
-  }, [productId, dupId, showApiError])
+  }, [productId, dupId, token, baseId, showApiError])
+
+  useEffect(() => {
+    setPendingMedia((prev) => {
+      for (const p of prev) {
+        URL.revokeObjectURL(p.objectUrl)
+      }
+      return []
+    })
+  }, [productId, dupId])
+
+  useEffect(() => {
+    return () => {
+      for (const p of pendingMediaRef.current) {
+        URL.revokeObjectURL(p.objectUrl)
+      }
+    }
+  }, [])
 
   useEffect(() => {
     if (!slug && name) setSlug(slugify(name))
@@ -517,7 +647,7 @@ export function ProductEditorPage() {
     if (mergedMedia.length > 0) {
       fd.set('mediaJson', JSON.stringify(mergedMedia))
     }
-    for (const file of mediaFiles.slice(0, 10)) {
+    for (const { file } of pendingMedia.slice(0, MAX_MEDIA_FILES)) {
       fd.append('media', file)
     }
     if (productTaxOverride) {
@@ -545,6 +675,49 @@ export function ProductEditorPage() {
     const discountRupees = parseInrInputToRupees(discountPriceRupees)
     return variantPriceAdjustmentErrorMessage(baseRupees, discountRupees, payload)
   }, [variantsEnabled, variants, basePriceRupees, discountPriceRupees])
+
+  const attachedUniversalFAQIDs = useMemo(() => {
+    return new Set(productFaqs.filter((x) => x.kind === 'universal').map((x) => x.faqId))
+  }, [productFaqs])
+
+  const filteredFAQBank = useMemo(() => {
+    const q = faqSearch.trim().toLowerCase()
+    if (!q) return faqBank
+    return faqBank.filter((f) => {
+      return f.question.toLowerCase().includes(q) || f.answer.toLowerCase().includes(q)
+    })
+  }, [faqBank, faqSearch])
+
+  function toggleUniversalFAQ(faqId: string) {
+    setProductFaqs((prev) => {
+      const idx = prev.findIndex((x) => x.kind === 'universal' && x.faqId === faqId)
+      if (idx >= 0) return prev.filter((_, i) => i !== idx)
+      return [...prev, { kind: 'universal', faqId }]
+    })
+  }
+
+  function addCustomFAQ() {
+    setProductFaqs((prev) => [
+      ...prev,
+      { kind: 'custom', id: `${baseId}-cfaq-${Date.now()}`, question: '', answer: '' },
+    ])
+  }
+
+  function moveFAQ(from: number, dir: -1 | 1) {
+    setProductFaqs((prev) => {
+      const to = from + dir
+      if (from < 0 || from >= prev.length || to < 0 || to >= prev.length) return prev
+      const next = [...prev]
+      const tmp = next[from]
+      next[from] = next[to]
+      next[to] = tmp
+      return next
+    })
+  }
+
+  function removeFAQ(index: number) {
+    setProductFaqs((prev) => prev.filter((_, i) => i !== index))
+  }
 
   async function handleSubmit(mode: 'draft' | 'publish') {
     if (!token) {
@@ -591,14 +764,24 @@ export function ProductEditorPage() {
     const published = mode === 'publish'
     setSaving(true)
     try {
+      const productFaqPayload: ProductFAQWriteItem[] = productFaqs.map((it) => {
+        if (it.kind === 'universal') return { faqId: it.faqId }
+        return { question: it.question, answer: it.answer }
+      })
+
       if (isEdit && productId) {
         // Multipart only: this backend matches the working Postman/curl flow; JSON PATCH can fail silently.
         await updateProduct(token, productId, buildProductFormData(published))
+        await putProductFAQs(token, productId, productFaqPayload)
         showToast(published ? 'Product published' : 'Draft saved', 'success')
         navigate('/products')
       } else {
         const fd = buildProductFormData(published)
-        await createProduct(token, fd)
+        const created = await createProduct(token, fd)
+        const newId = typeof created?.id === 'string' ? created.id : ''
+        if (newId) {
+          await putProductFAQs(token, newId, productFaqPayload)
+        }
         showToast(published ? 'Product published' : 'Draft saved', 'success')
         navigate('/products')
       }
@@ -613,6 +796,84 @@ export function ProductEditorPage() {
     name.trim() && brandId && categoryId && sku.trim() && buildSeo().slug,
   )
   const ready = baseReady && !variantPriceError
+
+  const addMediaFilesFromList = useCallback((files: File[]) => {
+    const next: PendingProductMedia[] = []
+    for (const f of files) {
+      if (!['image/png', 'image/jpeg', 'image/webp'].includes(f.type)) continue
+      if (f.size > MAX_IMAGE_BYTES) continue
+      next.push(createPendingProductMedia(f))
+    }
+    if (next.length === 0) return
+    setPendingMedia((prev) => {
+      const merged = [...prev, ...next]
+      if (merged.length <= MAX_MEDIA_FILES) return merged
+      const overflow = merged.slice(MAX_MEDIA_FILES)
+      for (const o of overflow) {
+        URL.revokeObjectURL(o.objectUrl)
+      }
+      return merged.slice(0, MAX_MEDIA_FILES)
+    })
+  }, [])
+
+  const removePendingMedia = useCallback((id: string) => {
+    setPendingMedia((prev) => {
+      const row = prev.find((p) => p.id === id)
+      if (row) URL.revokeObjectURL(row.objectUrl)
+      return prev.filter((p) => p.id !== id)
+    })
+  }, [])
+
+  const setExistingMediaPrimaryAt = useCallback((index: number) => {
+    setExistingMedia((prev) =>
+      prev.map((item, j) => {
+        const norm = normalizeProductMediaForApi([item])[0]
+        if (!norm) return item
+        if (norm.type.toLowerCase() === 'video') {
+          return patchMediaItemPrimary(item, false)
+        }
+        return patchMediaItemPrimary(item, j === index)
+      }),
+    )
+  }, [])
+
+  /** Clears primary on saved media and moves this upload first so the backend marks it primary (see multipart handler). */
+  const makePendingMediaPrimary = useCallback((id: string) => {
+    setExistingMedia((prev) => prev.map((item) => patchMediaItemPrimary(item, false)))
+    setPendingMedia((prev) => {
+      const idx = prev.findIndex((p) => p.id === id)
+      if (idx <= 0) return prev
+      const next = [...prev]
+      const [row] = next.splice(idx, 1)
+      next.unshift(row)
+      return next
+    })
+  }, [])
+
+  const openMediaPicker = useCallback(() => {
+    mediaInputRef.current?.click()
+  }, [])
+
+  const onMediaDragOver = useCallback((e: DragEvent<HTMLElement>) => {
+    e.preventDefault()
+    e.stopPropagation()
+  }, [])
+
+  const onMediaDrop = useCallback(
+    (e: DragEvent<HTMLElement>) => {
+      e.preventDefault()
+      e.stopPropagation()
+      const list = e.dataTransfer.files?.length ? [...e.dataTransfer.files] : []
+      addMediaFilesFromList(list)
+    },
+    [addMediaFilesFromList],
+  )
+
+  /** True when mediaJson already marks a saved item as primary (first new file is only primary if this is false). */
+  const existingJsonHasPrimary = useMemo(
+    () => normalizeProductMediaForApi(existingMedia).some((m) => m.isPrimary),
+    [existingMedia],
+  )
 
   if (loading) {
     return (
@@ -679,6 +940,131 @@ export function ProductEditorPage() {
                     rows={6}
                     className="mt-1 w-full resize-y rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/25 dark:border-slate-700 dark:bg-[#0f1419]"
                   />
+                </div>
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <div className="sm:col-span-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <label className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                        Composition
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setDescDoc((d) => {
+                            const texts = [...(d.composition?.texts ?? [])]
+                            texts.push('')
+                            return {
+                              ...d,
+                              composition: {
+                                ...(d.composition ?? { texts: [], hazardKey: '' }),
+                                texts,
+                              },
+                            }
+                          })
+                        }
+                        className="text-xs font-medium text-blue-600 hover:text-blue-500 dark:text-blue-400"
+                      >
+                        + Add line
+                      </button>
+                    </div>
+                    <div className="mt-1 space-y-2">
+                      {(descDoc.composition?.texts?.length ? descDoc.composition.texts : ['']).map((t, i) => (
+                        <div key={i} className="flex items-center gap-2">
+                          <input
+                            value={t}
+                            onChange={(e) =>
+                              setDescDoc((d) => {
+                                const base =
+                                  d.composition?.texts?.length ? [...d.composition.texts] : ['']
+                                base[i] = e.target.value
+                                return {
+                                  ...d,
+                                  composition: {
+                                    ...(d.composition ?? { texts: [], hazardKey: '' }),
+                                    texts: base,
+                                  },
+                                }
+                              })
+                            }
+                            placeholder="e.g. Chlorantraniliprole 18.50% SC"
+                            className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900"
+                          />
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setDescDoc((d) => {
+                                const base =
+                                  d.composition?.texts?.length ? [...d.composition.texts] : ['']
+                                const texts = base.filter((_, j) => j !== i)
+                                return {
+                                  ...d,
+                                  composition: {
+                                    ...(d.composition ?? { texts: [], hazardKey: '' }),
+                                    texts,
+                                  },
+                                }
+                              })
+                            }
+                            className="shrink-0 text-xs font-medium text-red-600 hover:underline dark:text-red-400"
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                      Hazard
+                    </label>
+                    <select
+                      value={descDoc.composition?.hazardKey ?? ''}
+                      onChange={(e) =>
+                        setDescDoc((d) => ({
+                          ...d,
+                          composition: {
+                            ...(d.composition ?? { texts: [], hazardKey: '' }),
+                            hazardKey: e.target.value,
+                          },
+                        }))
+                      }
+                      className="select-tail mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900"
+                      disabled={hazardsLoading}
+                    >
+                      <option value="">None</option>
+                      {descDoc.composition?.hazardKey &&
+                      !hazards.some((h) => h.key === descDoc.composition?.hazardKey) ? (
+                        <option value={descDoc.composition?.hazardKey}>
+                          Unknown ({descDoc.composition?.hazardKey})
+                        </option>
+                      ) : null}
+                      {hazards
+                        .filter((h) => h.isActive)
+                        .sort((a, b) => a.label.localeCompare(b.label))
+                        .map((h) => (
+                          <option key={h.id} value={h.key}>
+                            {h.label}
+                          </option>
+                        ))}
+                    </select>
+                    {descDoc.composition?.hazardKey ? (
+                      <div className="mt-2 flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+                        <span
+                          className="inline-block h-4 w-4 rounded border border-slate-200 dark:border-slate-700"
+                          style={{
+                            backgroundColor:
+                              hazards.find((h) => h.key === descDoc.composition?.hazardKey)?.color ??
+                              'transparent',
+                          }}
+                          aria-hidden
+                        />
+                        <span className="truncate">
+                          {hazards.find((h) => h.key === descDoc.composition?.hazardKey)?.label ??
+                            descDoc.composition?.hazardKey}
+                        </span>
+                      </div>
+                    ) : null}
+                  </div>
                 </div>
                 <div>
                   <div className="flex items-center justify-between gap-2">
@@ -947,24 +1333,206 @@ export function ProductEditorPage() {
           </section>
 
           <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-[#0f1419]">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">FAQs</h2>
+                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                  Append universal FAQs and add custom product-specific FAQs. Product FAQs show first, then universal.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={addCustomFAQ}
+                className="shrink-0 rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white hover:bg-blue-500"
+              >
+                + Custom FAQ
+              </button>
+            </div>
+
+            <div className="mt-4 grid gap-4 lg:grid-cols-2">
+              <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-4 dark:border-slate-800 dark:bg-slate-900/40">
+                <div className="flex items-center justify-between gap-2">
+                  <label className="text-xs font-semibold text-slate-700 dark:text-slate-200">
+                    Universal FAQ bank
+                  </label>
+                  <span className="text-[11px] text-slate-500 dark:text-slate-400">
+                    {faqLoading ? 'Loading…' : `${faqBank.length} total`}
+                  </span>
+                </div>
+                <input
+                  value={faqSearch}
+                  onChange={(e) => setFaqSearch(e.target.value)}
+                  placeholder="Search FAQs…"
+                  className="mt-2 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900"
+                />
+                <div className="mt-3 max-h-[320px] overflow-y-auto pr-1">
+                  {filteredFAQBank.length === 0 ? (
+                    <div className="rounded-lg border border-dashed border-slate-300 p-3 text-xs text-slate-500 dark:border-slate-700 dark:text-slate-400">
+                      No FAQs match your search.
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {filteredFAQBank.map((f) => {
+                        const checked = attachedUniversalFAQIDs.has(f.id)
+                        return (
+                          <label
+                            key={f.id}
+                            className={[
+                              'flex cursor-pointer items-start gap-3 rounded-lg border px-3 py-2 transition',
+                              checked
+                                ? 'border-blue-500/40 bg-blue-600/5'
+                                : 'border-slate-200 bg-white hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900/60 dark:hover:bg-slate-900',
+                            ].join(' ')}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              onChange={() => toggleUniversalFAQ(f.id)}
+                              className="mt-1"
+                            />
+                            <div className="min-w-0">
+                              <div className="truncate text-sm font-medium text-slate-900 dark:text-slate-50">
+                                {f.question}
+                              </div>
+                              <div className="mt-1 line-clamp-2 whitespace-pre-wrap text-xs text-slate-500 dark:text-slate-400">
+                                {f.answer}
+                              </div>
+                              {!f.isPublished ? (
+                                <div className="mt-1 text-[11px] font-medium text-amber-700 dark:text-amber-300">
+                                  Draft (won’t show on storefront)
+                                </div>
+                              ) : null}
+                            </div>
+                          </label>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-[#0b1220]">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="text-xs font-semibold text-slate-700 dark:text-slate-200">
+                    Appended to this product
+                  </div>
+                  <div className="text-[11px] text-slate-500 dark:text-slate-400">{productFaqs.length} items</div>
+                </div>
+                <div className="mt-3 space-y-3">
+                  {productFaqs.length === 0 ? (
+                    <div className="rounded-lg border border-dashed border-slate-300 p-3 text-xs text-slate-500 dark:border-slate-700 dark:text-slate-400">
+                      Nothing appended yet.
+                    </div>
+                  ) : (
+                    productFaqs.map((it, i) => (
+                      <div
+                        key={it.kind === 'universal' ? it.faqId : it.id}
+                        className="rounded-lg border border-slate-200 p-3 dark:border-slate-700"
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                            {it.kind === 'universal' ? 'Universal' : 'Custom'} · #{i + 1}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => moveFAQ(i, -1)}
+                              className="rounded border border-slate-200 px-2 py-1 text-[11px] text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-900"
+                              title="Move up"
+                            >
+                              ↑
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => moveFAQ(i, 1)}
+                              className="rounded border border-slate-200 px-2 py-1 text-[11px] text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-900"
+                              title="Move down"
+                            >
+                              ↓
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => removeFAQ(i)}
+                              className="rounded border border-red-200 px-2 py-1 text-[11px] text-red-600 hover:bg-red-50 dark:border-red-900/40 dark:text-red-300 dark:hover:bg-red-950/30"
+                              title="Remove"
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        </div>
+
+                        {it.kind === 'universal' ? (
+                          <div className="mt-2 text-sm text-slate-700 dark:text-slate-200">
+                            {faqBank.find((f) => f.id === it.faqId)?.question ?? it.faqId}
+                          </div>
+                        ) : (
+                          <div className="mt-2 space-y-2">
+                            <input
+                              value={it.question}
+                              onChange={(e) =>
+                                setProductFaqs((prev) =>
+                                  prev.map((x, j) =>
+                                    j === i && x.kind === 'custom' ? { ...x, question: e.target.value } : x,
+                                  ),
+                                )
+                              }
+                              placeholder="Question"
+                              className="w-full rounded border border-slate-200 bg-white px-2 py-1.5 text-sm dark:border-slate-700 dark:bg-slate-900"
+                            />
+                            <textarea
+                              value={it.answer}
+                              onChange={(e) =>
+                                setProductFaqs((prev) =>
+                                  prev.map((x, j) =>
+                                    j === i && x.kind === 'custom' ? { ...x, answer: e.target.value } : x,
+                                  ),
+                                )
+                              }
+                              placeholder="Answer"
+                              rows={3}
+                              className="w-full resize-y rounded border border-slate-200 bg-white px-2 py-1.5 text-sm dark:border-slate-700 dark:bg-slate-900"
+                            />
+                          </div>
+                        )}
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-[#0f1419]">
             <div className="flex items-center justify-between gap-2">
               <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
                 Media &amp; gallery
               </h2>
-              <span className="text-xs text-slate-500 dark:text-slate-400">Max 10 images</span>
+              <span className="text-xs text-slate-500 dark:text-slate-400">
+                Max {MAX_MEDIA_FILES} new uploads per save
+              </span>
             </div>
-            <label className="mt-4 flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-slate-200 bg-slate-50/50 px-4 py-10 transition hover:border-blue-400/60 hover:bg-blue-50/30 dark:border-slate-700 dark:bg-slate-900/40 dark:hover:border-blue-500/40">
-              <input
-                type="file"
-                accept="image/png,image/jpeg,image/webp"
-                multiple
-                className="sr-only"
-                onChange={(e) => {
-                  const list = e.target.files ? [...e.target.files] : []
-                  setMediaFiles((prev) => [...prev, ...list].slice(0, 10))
-                }}
-              />
-              <svg className="mb-2 h-10 w-10 text-slate-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.25} stroke="currentColor">
+            <input
+              ref={mediaInputRef}
+              type="file"
+              accept="image/png,image/jpeg,image/webp"
+              multiple
+              tabIndex={-1}
+              className="sr-only"
+              aria-hidden
+              onChange={(e) => {
+                const list = e.target.files ? [...e.target.files] : []
+                addMediaFilesFromList(list)
+                e.target.value = ''
+              }}
+            />
+            <button
+              type="button"
+              onClick={openMediaPicker}
+              onDragOver={onMediaDragOver}
+              onDrop={onMediaDrop}
+              className="mt-4 flex w-full cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-slate-200 bg-slate-50/50 px-4 py-10 text-left transition hover:border-blue-400/60 hover:bg-blue-50/30 dark:border-slate-700 dark:bg-slate-900/40 dark:hover:border-blue-500/40"
+            >
+              <svg className="mb-2 h-10 w-10 text-slate-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.25} stroke="currentColor" aria-hidden>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
               </svg>
               <span className="text-sm font-medium text-slate-700 dark:text-slate-200">
@@ -973,43 +1541,121 @@ export function ProductEditorPage() {
               <span className="mt-1 text-xs text-slate-500 dark:text-slate-400">
                 PNG, JPG or WebP (Max 5MB each)
               </span>
-            </label>
+            </button>
             <div className="mt-4 flex flex-wrap gap-2">
-              {existingThumb && !mediaFiles.length ? (
+              {existingMedia.map((item, i) => {
+                const norm = normalizeProductMediaForApi([item])[0]
+                if (!norm) return null
+                const src = resolveMediaUrl(norm.url)
+                const isVideo = norm.type.toLowerCase() === 'video'
+                return (
+                  <div
+                    key={`existing-${i}-${norm.url}`}
+                    className="relative h-20 w-20 overflow-hidden rounded-lg border border-slate-200 dark:border-slate-700"
+                  >
+                    {isVideo ? (
+                      <div className="flex h-full w-full items-center justify-center bg-slate-800 text-center text-[10px] font-medium text-white">
+                        Video
+                      </div>
+                    ) : (
+                      <img src={src} alt="" className="h-full w-full object-cover" />
+                    )}
+                    {norm.isPrimary ? (
+                      <span className="absolute left-1 top-1 rounded bg-blue-600 px-1 text-[9px] font-bold text-white">
+                        MAIN
+                      </span>
+                    ) : null}
+                    {!isVideo && !norm.isPrimary ? (
+                      <button
+                        type="button"
+                        className="absolute bottom-0 left-0 right-0 bg-black/65 py-0.5 text-[9px] font-semibold text-white hover:bg-black/80"
+                        onClick={(e) => {
+                          e.preventDefault()
+                          e.stopPropagation()
+                          setExistingMediaPrimaryAt(i)
+                        }}
+                      >
+                        Set main
+                      </button>
+                    ) : null}
+                    <button
+                      type="button"
+                      aria-label="Remove from gallery"
+                      className="absolute right-0.5 top-0.5 rounded bg-black/60 px-1.5 py-0.5 text-[11px] font-medium text-white hover:bg-black/75"
+                      onClick={(e) => {
+                        e.preventDefault()
+                        e.stopPropagation()
+                        setExistingMedia((m) => m.filter((_, j) => j !== i))
+                      }}
+                    >
+                      ×
+                    </button>
+                  </div>
+                )
+              })}
+              {existingMedia.length === 0 && existingThumb ? (
                 <div className="relative h-20 w-20 overflow-hidden rounded-lg border-2 border-blue-500/50">
                   <img src={existingThumb} alt="" className="h-full w-full object-cover" />
                   <span className="absolute left-1 top-1 rounded bg-blue-600 px-1 text-[9px] font-bold text-white">
                     MAIN
                   </span>
-                </div>
-              ) : null}
-              {mediaFiles.map((f, i) => (
-                <div
-                  key={`${f.name}-${i}`}
-                  className="relative h-20 w-20 overflow-hidden rounded-lg border border-slate-200 dark:border-slate-700"
-                >
-                  <img
-                    src={URL.createObjectURL(f)}
-                    alt=""
-                    className="h-full w-full object-cover"
-                  />
-                  {i === 0 ? (
-                    <span className="absolute left-1 top-1 rounded bg-blue-600 px-1 text-[9px] font-bold text-white">
-                      MAIN
-                    </span>
-                  ) : null}
                   <button
                     type="button"
-                    className="absolute right-0.5 top-0.5 rounded bg-black/60 px-1 text-[10px] text-white"
-                    onClick={() => setMediaFiles((m) => m.filter((_, j) => j !== i))}
+                    aria-label="Remove thumbnail"
+                    className="absolute right-0.5 top-0.5 rounded bg-black/60 px-1.5 py-0.5 text-[11px] font-medium text-white hover:bg-black/75"
+                    onClick={() => setExistingThumb('')}
                   >
                     ×
                   </button>
                 </div>
-              ))}
-              <div className="flex h-20 w-20 items-center justify-center rounded-lg border border-dashed border-slate-300 bg-slate-50 dark:border-slate-700 dark:bg-slate-900/60">
-                <span className="text-slate-400">+</span>
-              </div>
+              ) : null}
+              {pendingMedia.map((p, i) => {
+                const pendingIsMain = i === 0 && !existingJsonHasPrimary
+                return (
+                  <div
+                    key={p.id}
+                    className="relative h-20 w-20 overflow-hidden rounded-lg border border-slate-200 dark:border-slate-700"
+                  >
+                    <img
+                      src={p.objectUrl}
+                      alt=""
+                      className="h-full w-full object-cover"
+                    />
+                    {pendingIsMain ? (
+                      <span className="absolute left-1 top-1 rounded bg-blue-600 px-1 text-[9px] font-bold text-white">
+                        MAIN
+                      </span>
+                    ) : null}
+                    {!pendingIsMain ? (
+                      <button
+                        type="button"
+                        className="absolute bottom-0 left-0 right-0 bg-black/65 py-0.5 text-[9px] font-semibold text-white hover:bg-black/80"
+                        onClick={() => makePendingMediaPrimary(p.id)}
+                      >
+                        Set main
+                      </button>
+                    ) : null}
+                    <button
+                      type="button"
+                      aria-label="Remove image"
+                      className="absolute right-0.5 top-0.5 rounded bg-black/60 px-1.5 py-0.5 text-[11px] font-medium text-white hover:bg-black/75"
+                      onClick={() => removePendingMedia(p.id)}
+                    >
+                      ×
+                    </button>
+                  </div>
+                )
+              })}
+              {pendingMedia.length < MAX_MEDIA_FILES ? (
+                <button
+                  type="button"
+                  onClick={openMediaPicker}
+                  className="flex h-20 w-20 cursor-pointer items-center justify-center rounded-lg border border-dashed border-slate-300 bg-slate-50 text-slate-500 transition hover:border-blue-400/60 hover:bg-blue-50/40 hover:text-blue-600 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-400 dark:hover:border-blue-500/40 dark:hover:text-blue-400"
+                  aria-label="Add images"
+                >
+                  <span className="text-xl font-light leading-none">+</span>
+                </button>
+              ) : null}
             </div>
             <div className="mt-3">
               <label className="text-xs font-medium text-slate-500 dark:text-slate-400">
@@ -1396,7 +2042,7 @@ export function ProductEditorPage() {
         </div>
       </div>
 
-      <div className="fixed bottom-0 left-0 right-0 z-10 border-t border-slate-200 bg-white/95 px-4 py-3 backdrop-blur dark:border-slate-800 dark:bg-[#0a0c10]/95 lg:left-[260px]">
+      <div className="fixed inset-x-0 bottom-0 z-10 w-full border-t border-slate-200 bg-white/95 px-4 py-3 backdrop-blur dark:border-slate-800 dark:bg-[#0a0c10]/95">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-3">
           <button
             type="button"

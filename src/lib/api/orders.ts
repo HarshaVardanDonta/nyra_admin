@@ -68,6 +68,12 @@ function pickStr(o: Record<string, unknown>, key: string): string | undefined {
   return undefined
 }
 
+function pickBool(o: Record<string, unknown>, key: string): boolean | undefined {
+  const v = o[key]
+  if (typeof v === 'boolean') return v
+  return undefined
+}
+
 function normalizeListRow(raw: unknown): OrderListRow | null {
   const o = asRecord(raw)
   if (!o) return null
@@ -205,6 +211,8 @@ export type OrderAdminHeader = {
   last_updated_at: string
   payment_status: string
   created_at: string
+  /** When true, customer receives SMS/email on status change / admin cancel (if backend is configured). */
+  notify_customer_status_updates: boolean
 }
 
 export type OrderAdminAvailableStatus = { id: number; name: string }
@@ -407,6 +415,7 @@ function parseAdminDetails(raw: unknown): OrderAdminDetails {
       last_updated_at: pickStr(ord, 'last_updated_at') ?? '',
       payment_status: pickStr(ord, 'payment_status') ?? '',
       created_at: pickStr(ord, 'created_at') ?? '',
+      notify_customer_status_updates: pickBool(ord, 'notify_customer_status_updates') ?? true,
     },
     available_statuses: avail,
     items,
@@ -497,7 +506,11 @@ export async function refundOrder(
 export async function updateOrder(
   token: string | null,
   orderId: number,
-  body: { notes?: string | null; shipping_address_id?: number | null },
+  body: {
+    notes?: string | null
+    shipping_address_id?: number | null
+    notify_customer_status_updates?: boolean
+  },
 ): Promise<void> {
   await request(`${API}/orders/${orderId}`, {
     method: 'PUT',
@@ -505,6 +518,7 @@ export async function updateOrder(
     body: {
       notes: body.notes,
       shipping_address_id: body.shipping_address_id,
+      notify_customer_status_updates: body.notify_customer_status_updates,
     },
   })
 }

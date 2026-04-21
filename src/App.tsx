@@ -25,6 +25,10 @@ const ProductEditorPage = lazy(() =>
   import('./pages/product-editor-page').then((m) => ({ default: m.ProductEditorPage })),
 )
 
+const ProductDetailPage = lazy(() =>
+  import('./pages/product-detail-page').then((m) => ({ default: m.ProductDetailPage })),
+)
+
 const BrandsPage = lazy(() =>
   import('./pages/brands-page').then((m) => ({ default: m.BrandsPage })),
 )
@@ -105,6 +109,14 @@ const BlogDetailPage = lazy(() =>
 
 const BlogPromotionsPage = lazy(() =>
   import('./pages/blog-promotions-page').then((m) => ({ default: m.BlogPromotionsPage })),
+)
+
+const FaqsPage = lazy(() =>
+  import('./pages/faqs-page').then((m) => ({ default: m.FaqsPage })),
+)
+
+const HazardsPage = lazy(() =>
+  import('./pages/hazards-page').then((m) => ({ default: m.HazardsPage })),
 )
 
 const BlogPromotionEditorPage = lazy(() =>
@@ -217,6 +229,14 @@ function App() {
                   element={
                     <Suspense fallback={pageFallback}>
                       <ProductEditorPage />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="/products/:productId"
+                  element={
+                    <Suspense fallback={pageFallback}>
+                      <ProductDetailPage />
                     </Suspense>
                   }
                 />
@@ -425,6 +445,22 @@ function App() {
                   element={
                     <Suspense fallback={pageFallback}>
                       <BlogPromotionsPage />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="/faqs"
+                  element={
+                    <Suspense fallback={pageFallback}>
+                      <FaqsPage />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="/hazards"
+                  element={
+                    <Suspense fallback={pageFallback}>
+                      <HazardsPage />
                     </Suspense>
                   }
                 />

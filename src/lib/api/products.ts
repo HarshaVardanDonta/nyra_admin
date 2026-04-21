@@ -1,4 +1,4 @@
-import { fetchCatalogProductByKey, type CatalogProductRow } from './catalog'
+import { fetchProductByKey, type CatalogProductRow } from './catalog'
 import { request } from './client'
 
 export type ProductVariantInput = {
@@ -191,7 +191,7 @@ export async function patchProductFromCatalog(
   productId: string,
   amend?: ListRowProductAmend,
 ): Promise<unknown> {
-  const row = await fetchCatalogProductByKey(productId)
+  const row = await fetchProductByKey(token, productId)
   return updateProduct(token, productId, fullProductPatchFromListRow(row, amend))
 }
 

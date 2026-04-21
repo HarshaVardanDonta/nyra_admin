@@ -9,7 +9,12 @@ import {
   updateCategoryJson,
   updateCategoryMultipart,
 } from '../lib/api/categories'
-import { fetchCatalogCategories, type CatalogCategory } from '../lib/api/catalog'
+import {
+  catalogCategorySubtreeIds,
+  categoryBreadcrumb,
+  fetchCatalogCategories,
+  type CatalogCategory,
+} from '../lib/api/catalog'
 import { resolveMediaUrl } from '../lib/media-url'
 
 function slugify(s: string) {
@@ -186,8 +191,19 @@ export function CategoryEditorPage() {
   }, [isEdit, parentFromQuery])
 
   const parentChoices = useMemo(() => {
-    if (!categoryId) return parents
-    return parents.filter((c) => c.id !== categoryId)
+    let list: CatalogCategory[]
+    if (!categoryId) {
+      list = [...parents]
+    } else {
+      const blocked = catalogCategorySubtreeIds(categoryId, parents)
+      list = parents.filter((c) => !blocked.has(c.id))
+    }
+    list.sort((a, b) =>
+      categoryBreadcrumb(parents, a.id).localeCompare(categoryBreadcrumb(parents, b.id), undefined, {
+        sensitivity: 'base',
+      }),
+    )
+    return list
   }, [parents, categoryId])
 
   useEffect(() => {
@@ -451,7 +467,7 @@ export function CategoryEditorPage() {
                   <option value="">None (Top Level)</option>
                   {parentChoices.map((c) => (
                     <option key={c.id} value={c.id}>
-                      {c.name}
+                      {categoryBreadcrumb(parents, c.id)}
                     </option>
                   ))}
                 </select>
