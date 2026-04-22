@@ -351,6 +351,9 @@ export function AdminDrawer({
         <NavGroup title="System" collapsed={collapsed}>
           <NavRow to="/delivery-pincode-rules" label="Delivery pincodes" icon="truck" collapsed={collapsed} />
           <NavRow to="/store-tax" label="Store tax" icon="settings" collapsed={collapsed} />
+          <NavRow to="/store-invoice-settings" label="Invoice PDF" icon="document" collapsed={collapsed} />
+          <NavRow to="/store-policies" label="Policy pages" icon="document" collapsed={collapsed} />
+          <NavRow to="/store-footer-settings" label="Footer" icon="layout" collapsed={collapsed} />
           <NavRow to="/users" label="Users" icon="users" collapsed={collapsed} />
           <NavRow to="/order-lifecycle" label="Order lifecycle" icon="git" collapsed={collapsed} />
           <NavRow to="/analytics" label="Analytics" icon="chart" collapsed={collapsed} />

@@ -6,9 +6,9 @@ import { fetchOrderStatuses } from '../lib/api/order-statuses'
 import {
   type OrderListRow,
   type OrdersListParams,
-  downloadJsonFile,
   downloadOrdersExport,
-  fetchOrderInvoiceJson,
+  downloadPdfBlob,
+  fetchOrderInvoicePdf,
   fetchOrders,
 } from '../lib/api/orders'
 import { fetchUsersList, userPublicIdToOrderListQuery } from '../lib/api/users'
@@ -217,10 +217,10 @@ export function OrdersPage() {
 
   async function handleInvoiceDownload(orderId: number, orderNumber: string) {
     try {
-      const data = await fetchOrderInvoiceJson(token, orderId)
+      const blob = await fetchOrderInvoicePdf(token, orderId)
       const safe = orderNumber.replace(/[^\w-]+/g, '_') || String(orderId)
-      downloadJsonFile(`invoice-${safe}.json`, data)
-      showToast('Invoice data downloaded.', 'success')
+      downloadPdfBlob(`invoice-${safe}.pdf`, blob)
+      showToast('Invoice PDF downloaded.', 'success')
     } catch (e) {
       showApiError(e)
     }
@@ -433,8 +433,8 @@ export function OrdersPage() {
                           type="button"
                           onClick={() => void handleInvoiceDownload(row.id, row.order_number)}
                           className="rounded-lg p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 dark:hover:bg-slate-800 dark:hover:text-slate-50"
-                          title="Download invoice data (JSON)"
-                          aria-label="Download invoice"
+                          title="Download invoice PDF"
+                          aria-label="Download invoice PDF"
                         >
                           <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.75} stroke="currentColor">
                             <path

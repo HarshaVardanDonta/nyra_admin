@@ -163,6 +163,24 @@ const StoreTaxSettingsPage = lazy(() =>
   })),
 )
 
+const StoreInvoiceSettingsPage = lazy(() =>
+  import('./pages/store-invoice-settings-page').then((m) => ({
+    default: m.StoreInvoiceSettingsPage,
+  })),
+)
+
+const StorePolicyPagesPage = lazy(() =>
+  import('./pages/store-policy-pages').then((m) => ({
+    default: m.StorePolicyPagesPage,
+  })),
+)
+
+const StoreFooterSettingsPage = lazy(() =>
+  import('./pages/store-footer-settings-page').then((m) => ({
+    default: m.StoreFooterSettingsPage,
+  })),
+)
+
 const CustomersPage = lazy(() =>
   import('./pages/customers-page').then((m) => ({ default: m.CustomersPage })),
 )
@@ -557,6 +575,30 @@ function App() {
                   element={
                     <Suspense fallback={pageFallback}>
                       <StoreTaxSettingsPage />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="/store-invoice-settings"
+                  element={
+                    <Suspense fallback={pageFallback}>
+                      <StoreInvoiceSettingsPage />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="/store-policies"
+                  element={
+                    <Suspense fallback={pageFallback}>
+                      <StorePolicyPagesPage />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="/store-footer-settings"
+                  element={
+                    <Suspense fallback={pageFallback}>
+                      <StoreFooterSettingsPage />
                     </Suspense>
                   }
                 />

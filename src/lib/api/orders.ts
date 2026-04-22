@@ -527,7 +527,30 @@ export async function fetchOrderInvoiceJson(
   token: string | null,
   orderId: number,
 ): Promise<unknown> {
-  return request<unknown>(`${API}/orders/${orderId}/invoice`, { method: 'GET', token })
+  return request<unknown>(`${API}/orders/${orderId}/invoice?format=json`, {
+    method: 'GET',
+    token,
+  })
+}
+
+export async function fetchOrderInvoicePdf(
+  token: string | null,
+  orderId: number,
+): Promise<Blob> {
+  const res = await fetchWithAuthRetry(`${API}/orders/${orderId}/invoice`, { token })
+  return res.blob()
+}
+
+export function downloadPdfBlob(filename: string, blob: Blob) {
+  const href = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = href
+  a.download = filename
+  a.rel = 'noopener'
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  URL.revokeObjectURL(href)
 }
 
 export function downloadJsonFile(filename: string, data: unknown) {

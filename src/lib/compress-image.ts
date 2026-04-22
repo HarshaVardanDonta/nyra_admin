@@ -4,8 +4,10 @@
  */
 
 const MAX_EDGE_PX = 1920
+const INVOICE_LOGO_MAX_EDGE_PX = 512
 const WEBP_QUALITY = 0.82
 const JPEG_QUALITY = 0.85
+const INVOICE_LOGO_JPEG_QUALITY = 0.88
 
 function stripExtension(name: string): string {
   const i = name.lastIndexOf('.')
@@ -100,6 +102,61 @@ export async function compressImageForUpload(file: File): Promise<File> {
     }
 
     return blobToFile(best.blob, outputName(file.name, best.mime), best.mime)
+  } finally {
+    bitmap.close()
+  }
+}
+
+/**
+ * JPEG-only, modest dimensions — suitable for PDF invoice logos (go-pdf does not support WebP).
+ */
+export async function compressInvoiceLogoForUpload(file: File): Promise<File> {
+  if (!file.type.startsWith('image/') || file.type === 'image/svg+xml') {
+    return file
+  }
+
+  let bitmap: ImageBitmap | null = null
+  try {
+    bitmap = await createImageBitmap(file)
+  } catch {
+    return file
+  }
+
+  try {
+    const { width: iw, height: ih } = bitmap
+    if (iw < 1 || ih < 1) {
+      return file
+    }
+
+    const maxEdge = Math.max(iw, ih)
+    let w = iw
+    let h = ih
+    if (maxEdge > INVOICE_LOGO_MAX_EDGE_PX) {
+      const scale = INVOICE_LOGO_MAX_EDGE_PX / maxEdge
+      w = Math.max(1, Math.round(iw * scale))
+      h = Math.max(1, Math.round(ih * scale))
+    }
+
+    const canvas = document.createElement('canvas')
+    canvas.width = w
+    canvas.height = h
+    const ctx = canvas.getContext('2d', { alpha: true })
+    if (!ctx) {
+      return file
+    }
+    ctx.imageSmoothingEnabled = true
+    ctx.imageSmoothingQuality = 'high'
+    ctx.drawImage(bitmap, 0, 0, w, h)
+
+    const blob = await new Promise<Blob | null>((resolve) => {
+      canvas.toBlob((b) => resolve(b), 'image/jpeg', INVOICE_LOGO_JPEG_QUALITY)
+    })
+    if (!blob || blob.size < 1) {
+      return file
+    }
+
+    const base = stripExtension(file.name.trim()) || 'invoice-logo'
+    return blobToFile(blob, `${base}.jpg`, 'image/jpeg')
   } finally {
     bitmap.close()
   }

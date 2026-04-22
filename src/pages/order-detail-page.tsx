@@ -5,10 +5,10 @@ import { useToast } from '../contexts/use-toast'
 import {
   ORDER_CHANGED_BY,
   cancelOrder,
-  downloadJsonFile,
+  downloadPdfBlob,
   fetchOrderAdminDetails,
   fetchOrderEditableFields,
-  fetchOrderInvoiceJson,
+  fetchOrderInvoicePdf,
   patchOrderStatus,
   refundOrder,
   updateOrder,
@@ -264,10 +264,10 @@ export function OrderDetailPage() {
   async function handleInvoice() {
     if (!detail) return
     try {
-      const data = await fetchOrderInvoiceJson(token, orderId)
+      const blob = await fetchOrderInvoicePdf(token, orderId)
       const safe = detail.order.order_number.replace(/[^\w-]+/g, '_') || String(orderId)
-      downloadJsonFile(`invoice-${safe}.json`, data)
-      showToast('Invoice data downloaded.', 'success')
+      downloadPdfBlob(`invoice-${safe}.pdf`, blob)
+      showToast('Invoice PDF downloaded.', 'success')
     } catch (e) {
       showApiError(e)
     }
