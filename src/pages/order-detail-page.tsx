@@ -9,8 +9,9 @@ import {
   fetchOrderAdminDetails,
   fetchOrderEditableFields,
   fetchOrderInvoicePdf,
+  initiatePhonePeRefund,
   patchOrderStatus,
-  refundOrder,
+  syncPhonePeRefund,
   updateOrder,
   type OrderAdminDetails,
 } from '../lib/api/orders'
@@ -74,6 +75,32 @@ function paymentBadgeClass(status: string): string {
   return 'bg-slate-500/20 text-slate-200'
 }
 
+async function copyTextToClipboard(text: string): Promise<boolean> {
+  const t = text.trim()
+  if (!t) return false
+  try {
+    await navigator.clipboard.writeText(t)
+    return true
+  } catch {
+    // Fallback for older/blocked clipboard permissions.
+    try {
+      const ta = document.createElement('textarea')
+      ta.value = t
+      ta.setAttribute('readonly', '')
+      ta.style.position = 'fixed'
+      ta.style.left = '-9999px'
+      ta.style.top = '0'
+      document.body.appendChild(ta)
+      ta.select()
+      const ok = document.execCommand('copy')
+      ta.remove()
+      return ok
+    } catch {
+      return false
+    }
+  }
+}
+
 function mapsHref(sa: NonNullable<OrderAdminDetails['shipping_address']>): string {
   const q = [sa.address_line1, sa.city, sa.state, sa.zip, sa.country].filter(Boolean).join(', ')
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q)}`
@@ -99,9 +126,13 @@ export function OrderDetailPage() {
   const [savingStatus, setSavingStatus] = useState(false)
   const [savingNotes, setSavingNotes] = useState(false)
   const [cancelBusy, setCancelBusy] = useState(false)
-  const [refundOpen, setRefundOpen] = useState(false)
-  const [refundNote, setRefundNote] = useState('')
-  const [refundBusy, setRefundBusy] = useState(false)
+  const [ppRefundBusy, setPpRefundBusy] = useState(false)
+  const [ppRefundAttempt, setPpRefundAttempt] = useState<{
+    merchant_refund_id: string
+    state: string
+    completed_at: string | null
+    updated_at: string
+  } | null>(null)
   const [notifySaving, setNotifySaving] = useState(false)
 
   const loadAll = useCallback(async () => {
@@ -243,24 +274,6 @@ export function OrderDetailPage() {
     }
   }
 
-  async function handleRefundConfirm() {
-    setRefundBusy(true)
-    try {
-      await refundOrder(token, orderId, {
-        changed_by: ORDER_CHANGED_BY,
-        note: refundNote.trim() === '' ? null : refundNote.trim(),
-      })
-      showToast('Refund recorded.', 'success')
-      setRefundOpen(false)
-      setRefundNote('')
-      await loadAll()
-    } catch (e) {
-      showApiError(e)
-    } finally {
-      setRefundBusy(false)
-    }
-  }
-
   async function handleInvoice() {
     if (!detail) return
     try {
@@ -306,6 +319,47 @@ export function OrderDetailPage() {
   const { order, order_summary: sum, user, shipping_address: ship, payment, items, status_history } =
     detail
 
+  const statusName = order.current_status.name.trim().toLowerCase()
+  const paymentStatus = payment.status.trim().toLowerCase()
+  const alreadyRefunded = paymentStatus === 'refunded' || paymentStatus === 'partially_refunded'
+
+  async function handleInitiatePhonePeRefund() {
+    setPpRefundBusy(true)
+    try {
+      const res = await initiatePhonePeRefund(token, orderId)
+      setPpRefundAttempt({
+        merchant_refund_id: res.attempt.merchant_refund_id,
+        state: res.attempt.state,
+        completed_at: res.attempt.completed_at,
+        updated_at: res.attempt.updated_at,
+      })
+      showToast('PhonePe refund initiated (pending).', 'success')
+    } catch (e) {
+      showApiError(e)
+    } finally {
+      setPpRefundBusy(false)
+    }
+  }
+
+  async function handleSyncPhonePeRefund() {
+    setPpRefundBusy(true)
+    try {
+      const res = await syncPhonePeRefund(token, orderId)
+      setPpRefundAttempt({
+        merchant_refund_id: res.attempt.merchant_refund_id,
+        state: res.attempt.state,
+        completed_at: res.attempt.completed_at,
+        updated_at: res.attempt.updated_at,
+      })
+      showToast('Refund status refreshed.', 'success')
+      await loadAll()
+    } catch (e) {
+      showApiError(e)
+    } finally {
+      setPpRefundBusy(false)
+    }
+  }
+
   return (
     <div className="min-w-0 px-4 pt-6 pb-28 text-slate-900 dark:text-slate-50 sm:px-6 lg:p-10">
       <nav className="mb-4 text-sm text-slate-500 dark:text-slate-400">
@@ -348,13 +402,6 @@ export function OrderDetailPage() {
             </svg>
             {cancelBusy ? 'Cancelling…' : 'Cancel'}
           </button>
-          <button
-            type="button"
-            onClick={() => setRefundOpen(true)}
-            className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-800 dark:border-slate-600 dark:text-slate-100"
-          >
-            Refund
-          </button>
         </div>
       </div>
 
@@ -367,12 +414,51 @@ export function OrderDetailPage() {
               {order.current_status.name}
             </span>
           </div>
-          {order.current_status.name.trim().toLowerCase() === 'pending' &&
-          payment.status.trim().toLowerCase() === 'paid' ? (
+          {statusName === 'pending' && paymentStatus === 'paid' ? (
             <p className="mt-3 rounded-lg border border-emerald-500/35 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-900 dark:text-emerald-100">
               Payment received. Confirm the order (set status to <span className="font-semibold">Confirmed</span>)
               to start fulfillment. Refunds remain manual—use your bank or PhonePe dashboard as needed.
             </p>
+          ) : null}
+          {paymentStatus === 'paid' && !alreadyRefunded ? (
+            <div className="mt-3 rounded-lg border border-amber-500/35 bg-amber-500/10 px-3 py-2 text-sm text-amber-950 dark:text-amber-100">
+              <p className="font-semibold">Refund (PhonePe)</p>
+              <p className="mt-1">
+                Initiate a PhonePe refund for this paid order. (PhonePe may require the order status to be{' '}
+                <span className="font-semibold">Cancelled</span>.)
+              </p>
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  disabled={ppRefundBusy}
+                  onClick={() => void handleInitiatePhonePeRefund()}
+                  className="rounded-lg bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50 dark:bg-slate-200 dark:text-slate-900 dark:hover:bg-white"
+                >
+                  {ppRefundBusy ? 'Working…' : 'Initiate PhonePe refund'}
+                </button>
+                <button
+                  type="button"
+                  disabled={ppRefundBusy}
+                  onClick={() => void handleSyncPhonePeRefund()}
+                  className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-800 hover:bg-slate-50 disabled:opacity-50 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800"
+                >
+                  {ppRefundBusy ? 'Working…' : 'Refresh refund status'}
+                </button>
+              </div>
+              {ppRefundAttempt ? (
+                <div className="mt-3 rounded-lg border border-amber-500/20 bg-white/40 px-3 py-2 text-xs text-slate-900 dark:bg-slate-900/40 dark:text-slate-100">
+                  <p>
+                    <span className="font-semibold">PhonePe refund</span> ·{' '}
+                    <span className="font-mono">{ppRefundAttempt.merchant_refund_id}</span> ·{' '}
+                    <span className="font-semibold">{ppRefundAttempt.state}</span>
+                  </p>
+                  <p className="mt-1 text-slate-600 dark:text-slate-300">
+                    Updated: {formatDateTime(ppRefundAttempt.updated_at)}
+                    {ppRefundAttempt.completed_at ? ` · Completed: ${formatDateTime(ppRefundAttempt.completed_at)}` : ''}
+                  </p>
+                </div>
+              ) : null}
+            </div>
           ) : null}
           <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
             Last update: {formatDateTime(order.last_updated_at)}
@@ -658,7 +744,24 @@ export function OrderDetailPage() {
               {payment.method?.trim() ? payment.method : '—'}
             </p>
             {payment.transaction_id ? (
-              <p className="mt-1 text-slate-500 dark:text-slate-400">TXN: {payment.transaction_id}</p>
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <span className="text-slate-500 dark:text-slate-400">TXN</span>
+                <span className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1 font-mono text-xs text-slate-800 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100">
+                  {payment.transaction_id}
+                </span>
+                <button
+                  type="button"
+                  onClick={() =>
+                    void (async () => {
+                      const ok = await copyTextToClipboard(payment.transaction_id ?? '')
+                      showToast(ok ? 'Transaction ID copied.' : 'Could not copy transaction ID.', ok ? 'success' : 'error')
+                    })()
+                  }
+                  className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800"
+                >
+                  Copy
+                </button>
+              </div>
             ) : null}
             <div
               className={`mt-4 flex items-center justify-between rounded-lg px-3 py-2 text-sm font-medium ${paymentBadgeClass(payment.status)}`}
@@ -737,47 +840,6 @@ export function OrderDetailPage() {
           {savingNotes ? 'Saving…' : 'Save notes & address'}
         </button>
       </div>
-
-      {refundOpen ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <button
-            type="button"
-            className="absolute inset-0 bg-black/50"
-            aria-label="Close"
-            onClick={() => !refundBusy && setRefundOpen(false)}
-          />
-          <div className="relative z-10 w-full max-w-md rounded-xl border border-slate-200 bg-white p-6 shadow-xl dark:border-slate-700 dark:bg-[#111827]">
-            <h2 className="text-lg font-semibold">Refund order</h2>
-            <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
-              Add an optional note for the audit trail.
-            </p>
-            <textarea
-              value={refundNote}
-              onChange={(e) => setRefundNote(e.target.value)}
-              rows={3}
-              className="mt-4 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-900"
-            />
-            <div className="mt-6 flex justify-end gap-2">
-              <button
-                type="button"
-                disabled={refundBusy}
-                onClick={() => setRefundOpen(false)}
-                className="rounded-lg border border-slate-200 px-4 py-2 text-sm dark:border-slate-600"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                disabled={refundBusy}
-                onClick={() => void handleRefundConfirm()}
-                className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-              >
-                {refundBusy ? 'Processing…' : 'Confirm refund'}
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
     </div>
   )
 }

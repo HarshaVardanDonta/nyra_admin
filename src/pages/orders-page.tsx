@@ -100,6 +100,11 @@ export function OrdersPage() {
   const [statusOptions, setStatusOptions] = useState<{ id: number; name: string }[]>([])
   const [userOptions, setUserOptions] = useState<{ id: string; name: string }[]>([])
 
+  const cancelledStatusId = useMemo(() => {
+    const x = statusOptions.find((s) => s.name.trim().toLowerCase() === 'cancelled')
+    return x?.id
+  }, [statusOptions])
+
   useEffect(() => {
     const t = window.setTimeout(() => setSearchDebounced(search.trim()), 350)
     return () => window.clearTimeout(t)
@@ -267,6 +272,20 @@ export function OrdersPage() {
       </div>
 
       <div className="mb-6 flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-[#111827] lg:flex-row lg:flex-wrap lg:items-center [&>select]:min-w-[12rem] [&>select]:max-w-full [&>select]:shrink-0">
+        <button
+          type="button"
+          disabled={!cancelledStatusId}
+          onClick={() => {
+            if (!cancelledStatusId) return
+            setStatusId(String(cancelledStatusId))
+            setPaymentStatus('paid')
+            setPagination((p) => ({ ...p, page: 1 }))
+          }}
+          className="inline-flex items-center justify-center gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm font-medium text-amber-900 transition hover:bg-amber-500/15 disabled:opacity-50 dark:text-amber-100"
+          title="Show cancelled + paid orders needing manual refund"
+        >
+          Refund needed
+        </button>
         <div className="relative min-w-0 flex-1 lg:min-w-[200px]">
           <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">

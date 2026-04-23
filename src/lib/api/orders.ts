@@ -503,6 +503,38 @@ export async function refundOrder(
   })
 }
 
+export type PhonePeRefundAttempt = {
+  id: number
+  order_id: number
+  gateway: string
+  merchant_refund_id: string
+  amount_paisa: number
+  state: string
+  created_at: string
+  updated_at: string
+  completed_at: string | null
+}
+
+export async function initiatePhonePeRefund(
+  token: string | null,
+  orderId: number,
+): Promise<{ attempt: PhonePeRefundAttempt }> {
+  return request<{ attempt: PhonePeRefundAttempt }>(
+    `${API}/orders/${orderId}/refunds/phonepe/initiate`,
+    { method: 'POST', token, body: {} },
+  )
+}
+
+export async function syncPhonePeRefund(
+  token: string | null,
+  orderId: number,
+): Promise<{ attempt: PhonePeRefundAttempt }> {
+  return request<{ attempt: PhonePeRefundAttempt }>(
+    `${API}/orders/${orderId}/refunds/phonepe/sync`,
+    { method: 'POST', token, body: {} },
+  )
+}
+
 export async function updateOrder(
   token: string | null,
   orderId: number,
