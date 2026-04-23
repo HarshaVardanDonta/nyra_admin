@@ -5,6 +5,7 @@ export type StorePolicyPages = {
   termsOfServiceMarkdown: string
   cookiePolicyMarkdown: string
   deliveryPolicyMarkdown: string
+  refundPolicyMarkdown: string
   updatedAt?: string
 }
 
@@ -15,6 +16,7 @@ function normalizePolicyPages(raw: any): StorePolicyPages {
     termsOfServiceMarkdown: String(obj.termsOfServiceMarkdown ?? obj.TermsOfServiceMarkdown ?? '').trim(),
     cookiePolicyMarkdown: String(obj.cookiePolicyMarkdown ?? obj.CookiePolicyMarkdown ?? '').trim(),
     deliveryPolicyMarkdown: String(obj.deliveryPolicyMarkdown ?? obj.DeliveryPolicyMarkdown ?? '').trim(),
+    refundPolicyMarkdown: String(obj.refundPolicyMarkdown ?? obj.RefundPolicyMarkdown ?? '').trim(),
     updatedAt: obj.updatedAt ?? obj.UpdatedAt,
   }
 }

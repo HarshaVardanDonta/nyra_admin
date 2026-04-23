@@ -13,6 +13,7 @@ const empty = (): StorePolicyPages => ({
   termsOfServiceMarkdown: '',
   cookiePolicyMarkdown: '',
   deliveryPolicyMarkdown: '',
+  refundPolicyMarkdown: '',
   updatedAt: undefined,
 })
 
@@ -68,6 +69,10 @@ export function StorePolicyPagesPage() {
     }
     if (!form.deliveryPolicyMarkdown.trim()) {
       showToast('Delivery Policy is required.', 'error')
+      return
+    }
+    if (!form.refundPolicyMarkdown.trim()) {
+      showToast('Refund Policy is required.', 'error')
       return
     }
 
@@ -181,6 +186,23 @@ export function StorePolicyPagesPage() {
             value={form.deliveryPolicyMarkdown}
             onChange={(e) => set('deliveryPolicyMarkdown', e.target.value)}
             placeholder="Write Delivery Policy in Markdown…"
+          />
+        </section>
+
+        <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-[#111827]">
+          <h2 className="text-sm font-semibold text-slate-800 dark:text-slate-100">Refund Policy</h2>
+          <label
+            htmlFor={`${baseId}-refunds`}
+            className="mt-3 block text-xs font-medium text-slate-600 dark:text-slate-400"
+          >
+            Markdown
+          </label>
+          <textarea
+            id={`${baseId}-refunds`}
+            className={`${inputClass} min-h-[220px] font-mono`}
+            value={form.refundPolicyMarkdown}
+            onChange={(e) => set('refundPolicyMarkdown', e.target.value)}
+            placeholder="Write Refund Policy in Markdown…"
           />
         </section>
 
