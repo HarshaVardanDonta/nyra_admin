@@ -2,6 +2,7 @@ import { request } from './client'
 
 export type FAQ = {
   id: string
+  locale: string
   question: string
   answer: string
   isPublished: boolean
@@ -10,6 +11,7 @@ export type FAQ = {
 }
 
 export type FAQWrite = {
+  locale: string
   question: string
   answer: string
   isPublished: boolean
@@ -17,12 +19,13 @@ export type FAQWrite = {
 
 export async function fetchFAQs(
   token: string,
-  params: { limit: number; offset: number },
+  params: { limit: number; offset: number; locale?: string },
 ): Promise<{ faqs: FAQ[] }> {
   const qs = new URLSearchParams({
     limit: String(params.limit),
     offset: String(params.offset),
   })
+  if (params.locale) qs.set('locale', params.locale)
   return request(`/api/v1/faqs?${qs.toString()}`, { method: 'GET', token })
 }
 

@@ -4,6 +4,8 @@ import { useToast } from '../contexts/use-toast'
 import { ApiError } from '../lib/api/errors'
 import { createFAQ, deleteFAQ, fetchFAQs, patchFAQ, type FAQ, type FAQWrite } from '../lib/api/faqs'
 
+type SupportedLocale = 'en' | 'hi' | 'te'
+
 type FAQForm = {
   question: string
   answer: string
@@ -27,16 +29,26 @@ export function FaqsPage() {
   const [loading, setLoading] = useState(true)
   const [busyId, setBusyId] = useState<string | null>(null)
 
+  const [selectedLocale, setSelectedLocale] = useState<SupportedLocale>('en')
+
   const [modalOpen, setModalOpen] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
-  const [form, setForm] = useState<FAQForm>({ question: '', answer: '', isPublished: true })
+  const [form, setForm] = useState<FAQForm>({
+    question: '',
+    answer: '',
+    isPublished: true,
+  })
   const [saving, setSaving] = useState(false)
 
   const load = useCallback(async () => {
     if (!token) return
     setLoading(true)
     try {
-      const { faqs: list } = await fetchFAQs(token, { limit: 500, offset: 0 })
+      const { faqs: list } = await fetchFAQs(token, {
+        limit: 500,
+        offset: 0,
+        locale: selectedLocale,
+      })
       setFaqs(sortFAQs(list))
     } catch (e) {
       showApiError(e)
@@ -44,7 +56,7 @@ export function FaqsPage() {
     } finally {
       setLoading(false)
     }
-  }, [token, showApiError])
+  }, [token, showApiError, selectedLocale])
 
   useEffect(() => {
     void load()
@@ -78,7 +90,12 @@ export function FaqsPage() {
     }
     setSaving(true)
     try {
-      const payload: FAQWrite = { question: q, answer: a, isPublished: form.isPublished }
+      const payload: FAQWrite = {
+        locale: selectedLocale,
+        question: q,
+        answer: a,
+        isPublished: form.isPublished,
+      }
       if (editingId) {
         const updated = await patchFAQ(token, editingId, payload)
         setFaqs((prev) => sortFAQs(prev.map((x) => (x.id === updated.id ? updated : x))))
@@ -123,11 +140,30 @@ export function FaqsPage() {
             Universal FAQ bank for storefront. Published FAQs are shown on Home and appended to product pages.
           </p>
           <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+            English is the default locale. If a storefront locale has no FAQs, it falls back to English.
+          </p>
+          <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
             Published: <span className="font-medium text-slate-700 dark:text-slate-200">{publishedCount}</span> · Total:{' '}
             <span className="font-medium text-slate-700 dark:text-slate-200">{faqs.length}</span>
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
+          <label className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">
+            <span className="text-xs font-medium text-slate-600 dark:text-slate-300">Locale</span>
+            <select
+              value={selectedLocale}
+              onChange={(e) => {
+                const v = e.target.value
+                if (v === 'en' || v === 'hi' || v === 'te') setSelectedLocale(v)
+              }}
+              className="rounded-md border border-slate-200 bg-white px-2 py-1 text-sm dark:border-slate-700 dark:bg-slate-950"
+              aria-label="FAQ locale"
+            >
+              <option value="en">English</option>
+              <option value="hi">Hindi</option>
+              <option value="te">Telugu</option>
+            </select>
+          </label>
           <button
             type="button"
             onClick={() => void load()}
@@ -219,6 +255,16 @@ export function FaqsPage() {
               {editingId ? 'Edit FAQ' : 'Add FAQ'}
             </h2>
             <form className="mt-4 space-y-4" onSubmit={handleSave}>
+              <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-300">
+                Editing translation for locale:{' '}
+                <span className="font-semibold text-slate-800 dark:text-slate-100">
+                  {selectedLocale === 'en'
+                    ? 'English'
+                    : selectedLocale === 'hi'
+                      ? 'Hindi'
+                      : 'Telugu'}
+                </span>
+              </div>
               <div className="flex items-center justify-between">
                 <label className="text-xs font-medium text-slate-600 dark:text-slate-300">Published</label>
                 <button
