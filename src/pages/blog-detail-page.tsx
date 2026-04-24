@@ -6,6 +6,7 @@ import {
   deleteBlog,
   fetchBlogAnalytics,
   fetchBlogDetail,
+  fetchBlogTranslations,
   type BlogAnalytics,
   type BlogRecord,
 } from '../lib/api/blogs'
@@ -22,6 +23,9 @@ export function BlogDetailPage() {
   const { showToast, showApiError } = useToast()
   const [blog, setBlog] = useState<BlogRecord | null>(null)
   const [analytics, setAnalytics] = useState<BlogAnalytics | null>(null)
+  const [translations, setTranslations] = useState<
+    { lang: string; id: string; isPublished: boolean }[]
+  >([])
   const [loading, setLoading] = useState(true)
   const [deleting, setDeleting] = useState(false)
 
@@ -35,6 +39,16 @@ export function BlogDetailPage() {
       ])
       setBlog(b)
       setAnalytics(a)
+      try {
+        const list = await fetchBlogTranslations(token, blogId)
+        setTranslations(
+          list
+            .filter((x) => x.lang !== 'en')
+            .map((x) => ({ lang: x.lang, id: x.id, isPublished: x.isPublished })),
+        )
+      } catch {
+        setTranslations([])
+      }
     } catch (e) {
       showApiError(e)
       setBlog(null)
@@ -110,6 +124,30 @@ export function BlogDetailPage() {
           </button>
         </div>
       </div>
+
+      <section className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900/40">
+        <h2 className="text-sm font-semibold text-slate-800 dark:text-slate-200">Translations</h2>
+        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+          Hindi/Telugu are optional. Storefront falls back to English when missing.
+        </p>
+        <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
+          <span className="rounded-full bg-slate-200/70 px-2.5 py-1 text-xs font-semibold text-slate-800 dark:bg-slate-700/70 dark:text-slate-200">
+            EN {blog.isPublished ? 'Published' : 'Draft'}
+          </span>
+          {(['hi', 'te'] as const).map((lng) => {
+            const row = translations.find((x) => x.lang === lng)
+            return (
+              <span
+                key={lng}
+                className="rounded-full bg-slate-200/50 px-2.5 py-1 text-xs font-semibold text-slate-700 dark:bg-slate-700/50 dark:text-slate-200"
+                title={row ? (row.isPublished ? 'Published' : 'Draft') : 'Not created'}
+              >
+                {lng.toUpperCase()} {row ? (row.isPublished ? 'Published' : 'Draft') : 'Missing'}
+              </span>
+            )
+          })}
+        </div>
+      </section>
 
       {analytics ? (
         <section className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900/40">

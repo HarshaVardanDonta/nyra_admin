@@ -10,6 +10,8 @@ import {
   createBlog,
   fetchBlogDetail,
   fetchBlogTagNames,
+  fetchBlogTranslations,
+  upsertBlogTranslation,
   updateBlog,
   type BlogWriteInput,
 } from '../lib/api/blogs'
@@ -95,6 +97,18 @@ function BlogEditorPageInner() {
   const [isPublished, setIsPublished] = useState(false)
   const [loading, setLoading] = useState(!isNew)
   const [saving, setSaving] = useState(false)
+
+  const [translations, setTranslations] = useState<
+    { lang: 'hi' | 'te'; exists: boolean; isPublished: boolean }[]
+  >([
+    { lang: 'hi', exists: false, isPublished: false },
+    { lang: 'te', exists: false, isPublished: false },
+  ])
+  const [activeTranslation, setActiveTranslation] = useState<'en' | 'hi' | 'te'>('en')
+  const [trTitle, setTrTitle] = useState('')
+  const [trBody, setTrBody] = useState('')
+  const [trPublished, setTrPublished] = useState(false)
+  const [trSaving, setTrSaving] = useState(false)
   /** Snapshot of `body` from the server (or cleared for “new”); not updated on every keystroke — drives Editor.js initial props with `editorKey`. */
   const [editorSeedBody, setEditorSeedBody] = useState('')
   const loadGenerationRef = useRef(0)
@@ -120,6 +134,23 @@ function BlogEditorPageInner() {
       setEditorKey((k) => k + 1)
       setSelectedTags(b.tags.map((t) => t.trim().toLowerCase()).filter(Boolean))
       setIsPublished(b.isPublished)
+      setActiveTranslation('en')
+
+      // Load translation availability status.
+      try {
+        const list = await fetchBlogTranslations(token, blogId)
+        const hi = list.find((x) => x.lang === 'hi')
+        const te = list.find((x) => x.lang === 'te')
+        setTranslations([
+          { lang: 'hi', exists: Boolean(hi?.id), isPublished: hi?.isPublished === true },
+          { lang: 'te', exists: Boolean(te?.id), isPublished: te?.isPublished === true },
+        ])
+      } catch {
+        setTranslations([
+          { lang: 'hi', exists: false, isPublished: false },
+          { lang: 'te', exists: false, isPublished: false },
+        ])
+      }
       const ids = b.productIds
       if (ids.length > 0) {
         const rows = await Promise.all(
@@ -141,6 +172,28 @@ function BlogEditorPageInner() {
       setLoading(false)
     }
   }, [token, blogId, isNew, showApiError])
+
+  const loadTranslationDraft = useCallback(
+    async (lang: 'hi' | 'te') => {
+      if (!token || isNew || !blogId) return
+      setTrTitle('')
+      setTrBody('')
+      setTrPublished(false)
+      try {
+        const list = await fetchBlogTranslations(token, blogId)
+        const row = list.find((x) => x.lang === lang)
+        if (row?.id) {
+          const detail = await fetchBlogDetail(token, row.id)
+          setTrTitle(detail.title)
+          setTrBody(detail.body)
+          setTrPublished(detail.isPublished)
+        }
+      } catch {
+        // treat as empty draft
+      }
+    },
+    [token, isNew, blogId],
+  )
 
   useEffect(() => {
     if (isNew) {
@@ -365,6 +418,46 @@ function BlogEditorPageInner() {
     }
   }
 
+  async function handleSaveTranslation() {
+    if (!token || isNew || !blogId) return
+    if (activeTranslation === 'en') return
+    const lang = activeTranslation
+    if (lang !== 'hi' && lang !== 'te') return
+    const trimmed = trBody.trim()
+    if (!trTitle.trim()) {
+      showToast('Add a translated title.', 'error')
+      return
+    }
+    if (isLegacyHtmlBody(trBody)) {
+      if (!trimmed || trimmed === '<p></p>') {
+        showToast('Add some translated body content.', 'error')
+        return
+      }
+    } else if (!hasEditorJsMeaningfulContent(trBody)) {
+      showToast('Add some translated body content.', 'error')
+      return
+    }
+    setTrSaving(true)
+    try {
+      const { html: resolvedBody, revokePendingBlobs } = await resolveAndUpload(trBody, token)
+      await upsertBlogTranslation(token, blogId, {
+        lang,
+        title: trTitle,
+        body: resolvedBody,
+        isPublished: trPublished,
+      })
+      revokePendingBlobs()
+      showToast(`Saved ${lang.toUpperCase()} translation.`, 'success')
+      setTranslations((prev) =>
+        prev.map((x) => (x.lang === lang ? { ...x, exists: true, isPublished: trPublished } : x)),
+      )
+    } catch (e) {
+      showApiError(e)
+    } finally {
+      setTrSaving(false)
+    }
+  }
+
   if (loading) {
     return (
       <div className="mx-auto max-w-3xl px-4 py-12 text-sm text-slate-500 md:px-8">Loading…</div>
@@ -381,11 +474,118 @@ function BlogEditorPageInner() {
       <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-50">
         {isNew ? 'New blog' : 'Edit blog'}
       </h1>
+
+      {!isNew ? (
+        <div className="rounded-xl border border-slate-200 bg-white p-4 text-sm dark:border-slate-800 dark:bg-slate-900/40">
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Translations</p>
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              className={`rounded-lg px-3 py-1.5 text-sm font-medium ${
+                activeTranslation === 'en'
+                  ? 'bg-blue-600 text-white'
+                  : 'border border-slate-200 text-slate-700 dark:border-slate-700 dark:text-slate-200'
+              }`}
+              onClick={() => setActiveTranslation('en')}
+            >
+              EN
+            </button>
+            {translations.map((t) => (
+              <button
+                key={t.lang}
+                type="button"
+                className={`rounded-lg px-3 py-1.5 text-sm font-medium ${
+                  activeTranslation === t.lang
+                    ? 'bg-blue-600 text-white'
+                    : 'border border-slate-200 text-slate-700 dark:border-slate-700 dark:text-slate-200'
+                }`}
+                onClick={() => {
+                  setActiveTranslation(t.lang)
+                  void loadTranslationDraft(t.lang)
+                }}
+                title={t.exists ? (t.isPublished ? 'Published' : 'Draft') : 'Not created'}
+              >
+                {t.lang.toUpperCase()}
+                {t.exists ? (
+                  <span className="ml-2 text-[10px] font-semibold opacity-90">
+                    {t.isPublished ? 'P' : 'D'}
+                  </span>
+                ) : (
+                  <span className="ml-2 text-[10px] font-semibold opacity-60">—</span>
+                )}
+              </button>
+            ))}
+            <span className="ml-2 text-xs text-slate-500">
+              Slug/tags/products are shared from English.
+            </span>
+          </div>
+        </div>
+      ) : null}
+
       <form onSubmit={handleSubmit} className="space-y-5">
+        {activeTranslation !== 'en' ? (
+          <div className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900/40">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+              Editing {activeTranslation.toUpperCase()} translation
+            </p>
+            <label className="mt-3 block text-sm">
+              <span className="text-slate-600 dark:text-slate-300">Title</span>
+              <input
+                required
+                value={trTitle}
+                onChange={(e) => setTrTitle(e.target.value)}
+                className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50"
+              />
+            </label>
+            <div className="mt-4 block text-sm">
+              <span className="text-slate-600 dark:text-slate-300">Body</span>
+              <div className="mt-2">
+                {isLegacyHtmlBody(trBody) ? (
+                  <LegacyHtmlBlogEditor value={trBody} onChange={setTrBody} />
+                ) : (
+                  <BlogEditorJs
+                    key={`tr-${activeTranslation}-${editorKey}`}
+                    initialData={parseEditorJsBody(trBody) ?? emptyEditorOutput()}
+                    onChange={setTrBody}
+                    placeholder="Write translated article…"
+                  />
+                )}
+              </div>
+            </div>
+            <label className="mt-4 flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={trPublished}
+                onChange={(e) => setTrPublished(e.target.checked)}
+                className="rounded border-slate-300"
+              />
+              Published
+            </label>
+            <div className="mt-4 flex gap-3">
+              <button
+                type="button"
+                disabled={trSaving}
+                onClick={() => void handleSaveTranslation()}
+                className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+              >
+                {trSaving ? 'Saving…' : 'Save translation'}
+              </button>
+              <button
+                type="button"
+                className="rounded-lg border border-slate-200 px-4 py-2 text-sm dark:border-slate-700"
+                onClick={() => setActiveTranslation('en')}
+              >
+                Back to English
+              </button>
+            </div>
+          </div>
+        ) : null}
+
         <label className="block text-sm">
           <span className="text-slate-600 dark:text-slate-300">Title</span>
           <input
             required
+            disabled={activeTranslation !== 'en'}
             value={title}
             onChange={(e) => {
               const v = e.target.value
@@ -401,6 +601,7 @@ function BlogEditorPageInner() {
           <span className="text-slate-600 dark:text-slate-300">Slug</span>
           <input
             required
+            disabled={!isNew && activeTranslation !== 'en'}
             value={slug}
             onChange={(e) => {
               setSlugTouched(true)
@@ -456,6 +657,7 @@ function BlogEditorPageInner() {
               className="min-w-[120px] flex-1 border-0 bg-transparent px-1 py-1 text-sm outline-none dark:text-slate-100"
               placeholder="Type to search or add…"
               value={tagInput}
+              disabled={activeTranslation !== 'en'}
               onChange={(e) => {
                 setTagInput(e.target.value)
                 setTagMenuOpen(true)
@@ -549,6 +751,7 @@ function BlogEditorPageInner() {
               ref={productInputRef}
               type="text"
               value={productSearch}
+              disabled={activeTranslation !== 'en'}
               onChange={(e) => {
                 setProductSearch(e.target.value)
                 setProductPickerOpen(true)
@@ -613,6 +816,7 @@ function BlogEditorPageInner() {
           <input
             type="checkbox"
             checked={isPublished}
+            disabled={activeTranslation !== 'en'}
             onChange={(e) => setIsPublished(e.target.checked)}
             className="rounded border-slate-300"
           />
@@ -621,7 +825,7 @@ function BlogEditorPageInner() {
         <div className="flex gap-3">
           <button
             type="submit"
-            disabled={saving}
+            disabled={saving || activeTranslation !== 'en'}
             className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
           >
             {saving ? 'Saving…' : 'Save'}

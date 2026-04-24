@@ -27,6 +27,7 @@ export type BlogRecord = {
   title: string
   body: string
   slug: string
+  lang?: string
   isPublished: boolean
   tags: string[]
   productIds: string[]
@@ -41,8 +42,18 @@ export type BlogSummary = {
   id: string
   title: string
   slug: string
+  lang?: string
   isPublished: boolean
   tags: string[]
+  createdAt: string
+}
+
+export type BlogTranslationSummary = {
+  id: string
+  title: string
+  slug: string
+  lang: 'en' | 'hi' | 'te'
+  isPublished: boolean
   createdAt: string
 }
 
@@ -152,6 +163,7 @@ export function normalizeBlog(raw: unknown): BlogRecord {
     title: pickStr(o, 'title', 'Title') ?? '',
     body: pickStr(o, 'body', 'Body') ?? '',
     slug: pickStr(o, 'slug', 'Slug') ?? '',
+    lang: pickStr(o, 'lang', 'Lang'),
     isPublished: pickBool(o, 'isPublished', 'is_published') === true,
     tags,
     productIds: pids,
@@ -178,8 +190,24 @@ function normalizeSummary(raw: unknown): BlogSummary {
     id: pickStr(o, 'id', 'Id') ?? '',
     title: pickStr(o, 'title', 'Title') ?? '',
     slug: pickStr(o, 'slug', 'Slug') ?? '',
+    lang: pickStr(o, 'lang', 'Lang'),
     isPublished: pickBool(o, 'isPublished', 'is_published') === true,
     tags,
+    createdAt: pickStr(o, 'createdAt', 'created_at') ?? '',
+  }
+}
+
+function normalizeTranslationSummary(raw: unknown): BlogTranslationSummary | null {
+  if (!raw || typeof raw !== 'object') return null
+  const o = raw as Record<string, unknown>
+  const lang = (pickStr(o, 'lang', 'Lang') ?? '').trim().toLowerCase()
+  if (lang !== 'en' && lang !== 'hi' && lang !== 'te') return null
+  return {
+    id: pickStr(o, 'id', 'Id') ?? '',
+    title: pickStr(o, 'title', 'Title') ?? '',
+    slug: pickStr(o, 'slug', 'Slug') ?? '',
+    lang,
+    isPublished: pickBool(o, 'isPublished', 'is_published') === true,
     createdAt: pickStr(o, 'createdAt', 'created_at') ?? '',
   }
 }
@@ -221,6 +249,42 @@ export async function fetchBlogsList(
 export async function fetchBlogDetail(token: string | null, blogId: string): Promise<BlogRecord> {
   const enc = encodeURIComponent(blogId)
   const raw = await request<unknown>(`/api/v1/blogs/${enc}`, { method: 'GET', token })
+  return normalizeBlog(raw)
+}
+
+export async function fetchBlogTranslations(
+  token: string | null,
+  blogId: string,
+): Promise<BlogTranslationSummary[]> {
+  const enc = encodeURIComponent(blogId)
+  const raw = await request<unknown>(`/api/v1/blogs/${enc}/translations`, { method: 'GET', token })
+  if (!raw || typeof raw !== 'object') return []
+  const arr = (raw as Record<string, unknown>).translations
+  if (!Array.isArray(arr)) return []
+  const out: BlogTranslationSummary[] = []
+  for (const row of arr) {
+    const t = normalizeTranslationSummary(row)
+    if (t) out.push(t)
+  }
+  return out
+}
+
+export async function upsertBlogTranslation(
+  token: string,
+  blogId: string,
+  input: { lang: 'hi' | 'te'; title: string; body: string; isPublished: boolean },
+): Promise<BlogRecord> {
+  const enc = encodeURIComponent(blogId)
+  const raw = await request<unknown>(`/api/v1/blogs/${enc}/translations`, {
+    method: 'POST',
+    token,
+    body: {
+      lang: input.lang,
+      title: input.title.trim(),
+      body: input.body,
+      isPublished: input.isPublished,
+    },
+  })
   return normalizeBlog(raw)
 }
 
