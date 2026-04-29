@@ -225,6 +225,14 @@ export function OrderDetailPage() {
       showToast('Pick a valid status.', 'error')
       return
     }
+    if (sid === detail.order.current_status.id) {
+      showToast('Selected status already matches the current order status.', 'info')
+      return
+    }
+
+    const notifyCustomer = detail.order.notify_customer_status_updates
+    const customerEmail = detail.user?.email?.trim() ?? ''
+
     setSavingStatus(true)
     try {
       await patchOrderStatus(token, orderId, {
@@ -232,7 +240,14 @@ export function OrderDetailPage() {
         changed_by: ORDER_CHANGED_BY,
         note: statusNote.trim() === '' ? null : statusNote.trim(),
       })
-      showToast('Status updated.', 'success')
+      if (notifyCustomer && customerEmail) {
+        showToast(
+          `Status updated. Notifications are on—email goes to ${customerEmail} if SMTP is configured on the server.`,
+          'success',
+        )
+      } else {
+        showToast('Status updated.', 'success')
+      }
       await loadAll()
     } catch (e) {
       showApiError(e)
