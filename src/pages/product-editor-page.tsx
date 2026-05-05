@@ -21,14 +21,17 @@ import {
 import { fetchHazards, type Hazard } from '../lib/api/hazards'
 import {
   createProduct,
+  fetchProductTranslation,
   normalizeProductMediaForApi,
   parseInrInputToRupees,
   rupeesToFormString,
+  upsertProductTranslation,
   updateProduct,
   type ProductSeoInput,
   type ProductStatusInput,
   type ProductVariantInput,
 } from '../lib/api/products'
+import { ApiError } from '../lib/api/errors'
 import { resolveMediaUrl } from '../lib/media-url'
 import {
   APPLICATION_GUIDE_COLUMN_LABELS,
@@ -296,8 +299,15 @@ export function ProductEditorPage() {
   const [loading, setLoading] = useState(isEdit || Boolean(dupId))
   const [saving, setSaving] = useState(false)
 
+  const [editLocale, setEditLocale] = useState<'en' | 'hi' | 'te'>('en')
+  const translationMode = Boolean(productId) && editLocale !== 'en'
+  const [translationLoading, setTranslationLoading] = useState(false)
+  const [translationSaving, setTranslationSaving] = useState(false)
+
   const [name, setName] = useState('')
   const [descDoc, setDescDoc] = useState<ProductDescriptionV1>(() => emptyProductDescriptionV1())
+  const [trName, setTrName] = useState('')
+  const [trDescDoc, setTrDescDoc] = useState<ProductDescriptionV1>(() => emptyProductDescriptionV1())
   const [brandId, setBrandId] = useState('')
   const [categoryId, setCategoryId] = useState('')
   const [basePriceRupees, setBasePriceRupees] = useState('0')
@@ -353,6 +363,13 @@ export function ProductEditorPage() {
   >([])
 
   pendingMediaRef.current = pendingMedia
+
+  const baseHazardKey = descDoc.composition?.hazardKey ?? ''
+
+  const activeName = translationMode ? trName : name
+  const setActiveName = translationMode ? setTrName : setName
+  const activeDescDoc = translationMode ? trDescDoc : descDoc
+  const setActiveDescDoc = translationMode ? setTrDescDoc : setDescDoc
 
   const loadMeta = useCallback(async () => {
     const [b, c] = await Promise.all([fetchCatalogBrands(), fetchCatalogCategories()])
@@ -424,6 +441,9 @@ export function ProductEditorPage() {
             setDescDoc(parsed.doc)
           }
         }
+        setEditLocale('en')
+        setTrName('')
+        setTrDescDoc(emptyProductDescriptionV1())
         setBrandId(f.brandId)
         setCategoryId(f.categoryId)
         setBasePriceRupees(f.basePriceRupees || '0')
@@ -477,6 +497,52 @@ export function ProductEditorPage() {
       cancelled = true
     }
   }, [productId, dupId, token, baseId, showApiError])
+
+  useEffect(() => {
+    if (!token || !productId || editLocale === 'en') {
+      setTranslationLoading(false)
+      return
+    }
+    let cancelled = false
+    ;(async () => {
+      setTranslationLoading(true)
+      try {
+        const tr = await fetchProductTranslation(token, productId, editLocale)
+        if (cancelled) return
+        setTrName(tr.name ?? '')
+        const parsed = parseProductDescription(tr.description ?? '')
+        const nextDoc =
+          parsed.kind === 'plain'
+            ? { ...emptyProductDescriptionV1(), detailedDescription: parsed.text }
+            : parsed.doc
+        setTrDescDoc({
+          ...nextDoc,
+          composition: {
+            ...(nextDoc.composition ?? { texts: [], hazardKey: '' }),
+            hazardKey: baseHazardKey,
+          },
+        })
+      } catch (e) {
+        if (!cancelled && e instanceof ApiError && e.status === 404) {
+          setTrName(name)
+          setTrDescDoc({
+            ...descDoc,
+            composition: {
+              ...(descDoc.composition ?? { texts: [], hazardKey: '' }),
+              hazardKey: baseHazardKey,
+            },
+          })
+        } else if (!cancelled) {
+          showApiError(e)
+        }
+      } finally {
+        if (!cancelled) setTranslationLoading(false)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [token, productId, editLocale, baseHazardKey, name, descDoc, showApiError])
 
   useEffect(() => {
     setPendingMedia((prev) => {
@@ -720,6 +786,7 @@ export function ProductEditorPage() {
   }
 
   async function handleSubmit(mode: 'draft' | 'publish') {
+    if (translationMode) return
     if (!token) {
       showToast('Sign in again to continue.', 'error')
       return
@@ -796,6 +863,34 @@ export function ProductEditorPage() {
     name.trim() && brandId && categoryId && sku.trim() && buildSeo().slug,
   )
   const ready = baseReady && !variantPriceError
+
+  async function handleSaveTranslation() {
+    if (!token || !productId) return
+    if (editLocale === 'en') return
+    if (!trName.trim()) {
+      showToast('Product name is required for this translation.', 'error')
+      return
+    }
+    setTranslationSaving(true)
+    try {
+      const doc: ProductDescriptionV1 = {
+        ...trDescDoc,
+        composition: {
+          ...(trDescDoc.composition ?? { texts: [], hazardKey: '' }),
+          hazardKey: baseHazardKey,
+        },
+      }
+      await upsertProductTranslation(token, productId, editLocale, {
+        name: trName.trim(),
+        description: serializeProductDescriptionV1(doc),
+      })
+      showToast('Translation saved.', 'success')
+    } catch (e) {
+      showApiError(e)
+    } finally {
+      setTranslationSaving(false)
+    }
+  }
 
   const addMediaFilesFromList = useCallback((files: File[]) => {
     const next: PendingProductMedia[] = []
@@ -883,6 +978,14 @@ export function ProductEditorPage() {
     )
   }
 
+  if (translationMode && translationLoading) {
+    return (
+      <div className="flex min-h-[50vh] items-center justify-center text-sm text-slate-500 dark:text-slate-400">
+        Loading translation…
+      </div>
+    )
+  }
+
   return (
     <div className="min-w-0 px-4 pt-6 pb-36 text-slate-900 dark:text-slate-50 sm:px-6 lg:p-10">
       <div className="mb-8">
@@ -903,17 +1006,34 @@ export function ProductEditorPage() {
       <div className="flex min-w-0 flex-col gap-6 lg:flex-row lg:items-start">
         <div className="min-w-0 flex-1 space-y-6">
           <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-[#0f1419]">
-            <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-              Basic information
-            </h2>
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                Basic information
+              </h2>
+              {isEdit && !dupId ? (
+                <label className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                  Language
+                  <select
+                    value={editLocale}
+                    onChange={(e) => setEditLocale(e.target.value as 'en' | 'hi' | 'te')}
+                    className="select-tail mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900"
+                    disabled={saving || translationSaving}
+                  >
+                    <option value="en">English (base)</option>
+                    <option value="hi">Hindi</option>
+                    <option value="te">Telugu</option>
+                  </select>
+                </label>
+              ) : null}
+            </div>
             <div className="mt-4 space-y-4">
               <div>
                 <label className="text-xs font-medium text-slate-500 dark:text-slate-400">
                   Product name
                 </label>
                 <input
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
+                  value={activeName}
+                  onChange={(e) => setActiveName(e.target.value)}
                   placeholder="e.g. Wireless Noise Cancelling Headphones"
                   className="mt-1 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/25 dark:border-slate-700 dark:bg-slate-900/80"
                 />
@@ -932,9 +1052,9 @@ export function ProductEditorPage() {
                     Detailed description
                   </label>
                   <textarea
-                    value={descDoc.detailedDescription}
+                    value={activeDescDoc.detailedDescription}
                     onChange={(e) =>
-                      setDescDoc((d) => ({ ...d, detailedDescription: e.target.value }))
+                      setActiveDescDoc((d) => ({ ...d, detailedDescription: e.target.value }))
                     }
                     placeholder="Write the main product copy…"
                     rows={6}
@@ -950,7 +1070,7 @@ export function ProductEditorPage() {
                       <button
                         type="button"
                         onClick={() =>
-                          setDescDoc((d) => {
+                          setActiveDescDoc((d) => {
                             const texts = [...(d.composition?.texts ?? [])]
                             texts.push('')
                             return {
@@ -968,12 +1088,12 @@ export function ProductEditorPage() {
                       </button>
                     </div>
                     <div className="mt-1 space-y-2">
-                      {(descDoc.composition?.texts?.length ? descDoc.composition.texts : ['']).map((t, i) => (
+                      {(activeDescDoc.composition?.texts?.length ? activeDescDoc.composition.texts : ['']).map((t, i) => (
                         <div key={i} className="flex items-center gap-2">
                           <input
                             value={t}
                             onChange={(e) =>
-                              setDescDoc((d) => {
+                              setActiveDescDoc((d) => {
                                 const base =
                                   d.composition?.texts?.length ? [...d.composition.texts] : ['']
                                 base[i] = e.target.value
@@ -992,7 +1112,7 @@ export function ProductEditorPage() {
                           <button
                             type="button"
                             onClick={() =>
-                              setDescDoc((d) => {
+                              setActiveDescDoc((d) => {
                                 const base =
                                   d.composition?.texts?.length ? [...d.composition.texts] : ['']
                                 const texts = base.filter((_, j) => j !== i)
@@ -1018,7 +1138,7 @@ export function ProductEditorPage() {
                       Hazard
                     </label>
                     <select
-                      value={descDoc.composition?.hazardKey ?? ''}
+                      value={baseHazardKey}
                       onChange={(e) =>
                         setDescDoc((d) => ({
                           ...d,
@@ -1029,13 +1149,12 @@ export function ProductEditorPage() {
                         }))
                       }
                       className="select-tail mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900"
-                      disabled={hazardsLoading}
+                      disabled={hazardsLoading || translationMode}
                     >
                       <option value="">None</option>
-                      {descDoc.composition?.hazardKey &&
-                      !hazards.some((h) => h.key === descDoc.composition?.hazardKey) ? (
-                        <option value={descDoc.composition?.hazardKey}>
-                          Unknown ({descDoc.composition?.hazardKey})
+                      {baseHazardKey && !hazards.some((h) => h.key === baseHazardKey) ? (
+                        <option value={baseHazardKey}>
+                          Unknown ({baseHazardKey})
                         </option>
                       ) : null}
                       {hazards
@@ -1047,20 +1166,19 @@ export function ProductEditorPage() {
                           </option>
                         ))}
                     </select>
-                    {descDoc.composition?.hazardKey ? (
+                    {baseHazardKey ? (
                       <div className="mt-2 flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
                         <span
                           className="inline-block h-4 w-4 rounded border border-slate-200 dark:border-slate-700"
                           style={{
                             backgroundColor:
-                              hazards.find((h) => h.key === descDoc.composition?.hazardKey)?.color ??
+                              hazards.find((h) => h.key === baseHazardKey)?.color ??
                               'transparent',
                           }}
                           aria-hidden
                         />
                         <span className="truncate">
-                          {hazards.find((h) => h.key === descDoc.composition?.hazardKey)?.label ??
-                            descDoc.composition?.hazardKey}
+                          {hazards.find((h) => h.key === baseHazardKey)?.label ?? baseHazardKey}
                         </span>
                       </div>
                     ) : null}
@@ -1074,7 +1192,7 @@ export function ProductEditorPage() {
                     <button
                       type="button"
                       onClick={() =>
-                        setDescDoc((d) => ({
+                        setActiveDescDoc((d) => ({
                           ...d,
                           applicationGuide: {
                             rows: [...d.applicationGuide.rows, emptyApplicationGuideRow()],
@@ -1102,7 +1220,7 @@ export function ProductEditorPage() {
                         </tr>
                       </thead>
                       <tbody>
-                        {descDoc.applicationGuide.rows.length === 0 ? (
+                        {activeDescDoc.applicationGuide.rows.length === 0 ? (
                           <tr>
                             <td
                               colSpan={6}
@@ -1112,7 +1230,7 @@ export function ProductEditorPage() {
                             </td>
                           </tr>
                         ) : (
-                          descDoc.applicationGuide.rows.map((row, ri) => (
+                          activeDescDoc.applicationGuide.rows.map((row, ri) => (
                             <tr
                               key={ri}
                               className="border-b border-slate-100 dark:border-slate-800"
@@ -1122,7 +1240,7 @@ export function ProductEditorPage() {
                                   <input
                                     value={row[key]}
                                     onChange={(e) =>
-                                      setDescDoc((d) => {
+                                      setActiveDescDoc((d) => {
                                         const rows = [...d.applicationGuide.rows]
                                         rows[ri] = { ...rows[ri], [key]: e.target.value }
                                         return { ...d, applicationGuide: { rows } }
@@ -1136,7 +1254,7 @@ export function ProductEditorPage() {
                                 <button
                                   type="button"
                                   onClick={() =>
-                                    setDescDoc((d) => ({
+                                    setActiveDescDoc((d) => ({
                                       ...d,
                                       applicationGuide: {
                                         rows: d.applicationGuide.rows.filter((_, j) => j !== ri),
@@ -1163,7 +1281,7 @@ export function ProductEditorPage() {
                     <button
                       type="button"
                       onClick={() =>
-                        setDescDoc((d) => ({
+                        setActiveDescDoc((d) => ({
                           ...d,
                           howToGrow: [...d.howToGrow, { title: '', detail: '' }],
                         }))
@@ -1174,7 +1292,7 @@ export function ProductEditorPage() {
                     </button>
                   </div>
                   <div className="mt-2 space-y-3">
-                    {descDoc.howToGrow.map((step, si) => (
+                    {activeDescDoc.howToGrow.map((step, si) => (
                       <div
                         key={si}
                         className="rounded-lg border border-slate-100 bg-slate-50/80 p-3 dark:border-slate-800 dark:bg-slate-900/40"
@@ -1186,7 +1304,7 @@ export function ProductEditorPage() {
                           <button
                             type="button"
                             onClick={() =>
-                              setDescDoc((d) => ({
+                              setActiveDescDoc((d) => ({
                                 ...d,
                                 howToGrow: d.howToGrow.filter((_, j) => j !== si),
                               }))
@@ -1199,7 +1317,7 @@ export function ProductEditorPage() {
                         <input
                           value={step.title}
                           onChange={(e) =>
-                            setDescDoc((d) => {
+                            setActiveDescDoc((d) => {
                               const howToGrow = [...d.howToGrow]
                               howToGrow[si] = { ...howToGrow[si], title: e.target.value }
                               return { ...d, howToGrow }
@@ -1211,7 +1329,7 @@ export function ProductEditorPage() {
                         <textarea
                           value={step.detail}
                           onChange={(e) =>
-                            setDescDoc((d) => {
+                            setActiveDescDoc((d) => {
                               const howToGrow = [...d.howToGrow]
                               howToGrow[si] = { ...howToGrow[si], detail: e.target.value }
                               return { ...d, howToGrow }
@@ -1233,7 +1351,7 @@ export function ProductEditorPage() {
                     <button
                       type="button"
                       onClick={() =>
-                        setDescDoc((d) => ({
+                        setActiveDescDoc((d) => ({
                           ...d,
                           technicalSpecs: [...d.technicalSpecs, { label: '', value: '' }],
                         }))
@@ -1244,12 +1362,12 @@ export function ProductEditorPage() {
                     </button>
                   </div>
                   <div className="mt-2 space-y-2">
-                    {descDoc.technicalSpecs.map((spec, ti) => (
+                    {activeDescDoc.technicalSpecs.map((spec, ti) => (
                       <div key={ti} className="flex flex-wrap items-center gap-2">
                         <input
                           value={spec.label}
                           onChange={(e) =>
-                            setDescDoc((d) => {
+                            setActiveDescDoc((d) => {
                               const technicalSpecs = [...d.technicalSpecs]
                               technicalSpecs[ti] = {
                                 ...technicalSpecs[ti],
@@ -1264,7 +1382,7 @@ export function ProductEditorPage() {
                         <input
                           value={spec.value}
                           onChange={(e) =>
-                            setDescDoc((d) => {
+                            setActiveDescDoc((d) => {
                               const technicalSpecs = [...d.technicalSpecs]
                               technicalSpecs[ti] = {
                                 ...technicalSpecs[ti],
@@ -1279,7 +1397,7 @@ export function ProductEditorPage() {
                         <button
                           type="button"
                           onClick={() =>
-                            setDescDoc((d) => ({
+                            setActiveDescDoc((d) => ({
                               ...d,
                               technicalSpecs: d.technicalSpecs.filter((_, j) => j !== ti),
                             }))
@@ -1302,6 +1420,7 @@ export function ProductEditorPage() {
                     value={brandId}
                     onChange={(e) => setBrandId(e.target.value)}
                     className="select-tail mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900"
+                    disabled={translationMode}
                   >
                     <option value="">Select Brand</option>
                     {brands.map((b) => (
@@ -1319,6 +1438,7 @@ export function ProductEditorPage() {
                     value={categoryId}
                     onChange={(e) => setCategoryId(e.target.value)}
                     className="select-tail mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900"
+                    disabled={translationMode}
                   >
                     <option value="">Select Category</option>
                     {categories.map((c) => (
@@ -1524,6 +1644,7 @@ export function ProductEditorPage() {
                 addMediaFilesFromList(list)
                 e.target.value = ''
               }}
+              disabled={translationMode}
             />
             <button
               type="button"
@@ -1531,6 +1652,7 @@ export function ProductEditorPage() {
               onDragOver={onMediaDragOver}
               onDrop={onMediaDrop}
               className="mt-4 flex w-full cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-slate-200 bg-slate-50/50 px-4 py-10 text-left transition hover:border-blue-400/60 hover:bg-blue-50/30 dark:border-slate-700 dark:bg-slate-900/40 dark:hover:border-blue-500/40"
+              disabled={translationMode}
             >
               <svg className="mb-2 h-10 w-10 text-slate-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.25} stroke="currentColor" aria-hidden>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
@@ -1582,6 +1704,7 @@ export function ProductEditorPage() {
                       type="button"
                       aria-label="Remove from gallery"
                       className="absolute right-0.5 top-0.5 rounded bg-black/60 px-1.5 py-0.5 text-[11px] font-medium text-white hover:bg-black/75"
+                      disabled={translationMode}
                       onClick={(e) => {
                         e.preventDefault()
                         e.stopPropagation()
@@ -1603,6 +1726,7 @@ export function ProductEditorPage() {
                     type="button"
                     aria-label="Remove thumbnail"
                     className="absolute right-0.5 top-0.5 rounded bg-black/60 px-1.5 py-0.5 text-[11px] font-medium text-white hover:bg-black/75"
+                    disabled={translationMode}
                     onClick={() => setExistingThumb('')}
                   >
                     ×
@@ -1639,6 +1763,7 @@ export function ProductEditorPage() {
                       type="button"
                       aria-label="Remove image"
                       className="absolute right-0.5 top-0.5 rounded bg-black/60 px-1.5 py-0.5 text-[11px] font-medium text-white hover:bg-black/75"
+                      disabled={translationMode}
                       onClick={() => removePendingMedia(p.id)}
                     >
                       ×
@@ -1667,6 +1792,7 @@ export function ProductEditorPage() {
                 placeholder='[{"url":"https://...","type":"video","isPrimary":false}]'
                 rows={2}
                 className="mt-1 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 font-mono text-xs dark:border-slate-700 dark:bg-slate-900/80"
+                disabled={translationMode}
               />
             </div>
           </section>
@@ -1756,6 +1882,7 @@ export function ProductEditorPage() {
                       })}
                       <VariantValueAdd
                         onAdd={(v) => addVariantValue(i, v)}
+                        disabled={translationMode}
                       />
                     </div>
                     {asVariantValueArray(opt.values).length > 0 ? (
@@ -2065,14 +2192,25 @@ export function ProductEditorPage() {
                 Save Draft
               </button>
             ) : null}
-            <button
-              type="button"
-              disabled={saving || !ready}
-              onClick={() => void handleSubmit('publish')}
-              className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-blue-500 disabled:opacity-50"
-            >
-              {isEdit ? 'Save changes' : 'Publish Product'}
-            </button>
+            {translationMode ? (
+              <button
+                type="button"
+                disabled={translationSaving || !trName.trim()}
+                onClick={() => void handleSaveTranslation()}
+                className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-blue-500 disabled:opacity-50"
+              >
+                {translationSaving ? 'Saving…' : 'Save translation'}
+              </button>
+            ) : (
+              <button
+                type="button"
+                disabled={saving || !ready}
+                onClick={() => void handleSubmit('publish')}
+                className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-blue-500 disabled:opacity-50"
+              >
+                {isEdit ? 'Save changes' : 'Publish Product'}
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -2080,7 +2218,7 @@ export function ProductEditorPage() {
   )
 }
 
-function VariantValueAdd({ onAdd }: { onAdd: (v: string) => void }) {
+function VariantValueAdd({ onAdd, disabled }: { onAdd: (v: string) => void; disabled?: boolean }) {
   const [v, setV] = useState('')
   return (
     <span className="inline-flex items-center gap-1 rounded-full border border-dashed border-slate-300 px-2 py-0.5 dark:border-slate-600">
@@ -2096,6 +2234,7 @@ function VariantValueAdd({ onAdd }: { onAdd: (v: string) => void }) {
         }}
         placeholder="+ Add value"
         className="w-24 border-0 bg-transparent text-xs outline-none"
+        disabled={disabled}
       />
       <button
         type="button"
@@ -2104,6 +2243,7 @@ function VariantValueAdd({ onAdd }: { onAdd: (v: string) => void }) {
           onAdd(v)
           setV('')
         }}
+        disabled={disabled}
       >
         Add
       </button>

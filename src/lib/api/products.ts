@@ -42,6 +42,43 @@ export async function updateProduct(
   })
 }
 
+export type ProductTranslationPayload = {
+  productId: string
+  locale: 'en' | 'hi' | 'te' | string
+  name: string
+  description: string
+  createdAt?: string
+  updatedAt?: string
+}
+
+export async function fetchProductTranslation(
+  token: string,
+  productId: string,
+  locale: 'en' | 'hi' | 'te',
+): Promise<ProductTranslationPayload> {
+  const encoded = encodeURIComponent(productId)
+  const loc = encodeURIComponent(locale)
+  return request(`/api/v1/products/${encoded}/translations/${loc}`, {
+    method: 'GET',
+    token,
+  })
+}
+
+export async function upsertProductTranslation(
+  token: string,
+  productId: string,
+  locale: 'en' | 'hi' | 'te',
+  input: { name: string; description: string },
+): Promise<ProductTranslationPayload> {
+  const encoded = encodeURIComponent(productId)
+  const loc = encodeURIComponent(locale)
+  return request(`/api/v1/products/${encoded}/translations/${loc}`, {
+    method: 'PUT',
+    token,
+    body: input,
+  })
+}
+
 /** Use in PATCH bodies / mediaJson; catalog may return PascalCase (URL, Type, IsPrimary). */
 export function normalizeProductMediaForApi(
   entries: unknown[],
